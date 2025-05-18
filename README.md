@@ -27,6 +27,10 @@ curl -sfL https://github.com/rancher/rke2/releases/download/v1.32.3+rke2r1/rke2.
 
 # Download the rke2 images
 curl -OLs https://github.com/rancher/rke2/releases/download/v1.32.3%2Brke2r2/rke2-images.linux-amd64.tar.zst -o rke2-images-all.linux-amd64.tar.gz
+
+Download rpm packages for RKE2
+sudo dnf install dnf-plugins-core -y
+sudo dnf download --resolve rke2-common rke2-server rke2-agent rke2-selinux
 ```
 
 ### How to Build the Bundle
