@@ -1,0 +1,29 @@
+cluster:
+  name: my-rke2-cluster
+  version: v1.32.3
+  airgap_bundle_path: /opt/rke2-airgapped-bundle.tar.gz
+  rke2_rpm_path: /opt/rke2/rpms
+  tar_extract_path: /opt/rke2
+  systemd_service_path: /etc/systemd/system/
+
+nodes:
+  servers:
+    - hostname: rke2-server-1
+      ip: 10.0.4.10
+      user: root
+      ssh_key: .ssh/rke2_cluster_key
+
+    # - hostname: rke2-server-2
+    #   ip: 192.168.1.11
+    #   user: root
+    #   ssh_key: /path/to/private_key
+
+  agents:
+    - hostname: rke2-agent-1
+      ip: 10.0.4.177
+      user: root
+      ssh_key: .ssh/rke2_cluster_key
+    # - hostname: rke2-agent-2
+    #   ip: 192.168.1.21
+    #   user: root
+    #   ssh_key: /path/to/private_key
