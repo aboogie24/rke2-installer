@@ -19,7 +19,7 @@ cluster:
   kube_apiserver_arg:
     - "enable-admission-plugins=NodeRestriction,PodSecurityPolicy"
   container_runtime_endpoint: unix:///var/run/k3s/containerd/containerd.sock
-  pause_image: registry.example.com/pause:3.6
+  pause_image: registry.example.com/pause:3.6 # This isn't really needed
   disable:
     - rke2-ingress-nginx
 
@@ -44,3 +44,6 @@ nodes:
     #   ip: 192.168.1.21
     #   user: root
     #   ssh_key: /path/to/private_key
+
+extra_tools:
+  - k9s

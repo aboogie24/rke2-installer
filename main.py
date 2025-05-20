@@ -6,7 +6,7 @@ import paramiko
 from deploy.node import setup_node
 from deploy.health import post_install_health_check
 from deploy.utils import log_message, log_error, log_success, log_warning
-from logo.space_jam_logo import display_animated_logo, display_space_jam_logo1
+from logo.space_jam_logo import display_animated_logo, display_space_jam_logo4
 
 colorama.init(autoreset=True)
 
@@ -21,10 +21,18 @@ def cli():
 
 @cli.command()
 @click.option('--config', '-c', required=True, help='Path to config.yml')
-def deploy(config):
+@click.option('--extra-tools', '-e', multiple=True, 
+              help='Install additional tools (specify multiple times for multiple tools, e.g., -e k9s -e helm)')
+def deploy(config, extra_tools):
     """Deploy RKE2 Cluster"""
     display_animated_logo()
     cfg = load_config(config)
+
+    # Add extra_tools to config
+    if extra_tools:
+        cfg['extra_tools'] = list(extra_tools)
+        click.echo(colorama.Fore.CYAN + "Extra tools to be installed: " + 
+                   colorama.Fore.YELLOW + f"{', '.join(extra_tools)}")
 
     click.echo(colorama.Fore.CYAN + f"Deploying RKE2 cluster: " + colorama.Fore.YELLOW + f"{cfg['cluster']['name']}\n")
 
@@ -45,8 +53,8 @@ def deploy(config):
     # Post-install health check
     for node in cfg['nodes']['servers']:
         post_install_health_check(node)
-    
-    display_space_jam_logo1()
+            
+    display_space_jam_logo4()
 
 
 @cli.command()
@@ -86,7 +94,7 @@ def uninstall(config, force):
     click.echo(colorama.Fore.GREEN + f"RKE2 uninstallation complete for cluster " + 
                colorama.Fore.YELLOW + f"{cfg['cluster']['name']}")
     
-    display_space_jam_logo1()
+    display_space_jam_logo4()
 
 def uninstall_rke2(node, is_server=True):
     """Uninstall RKE2 from a node"""

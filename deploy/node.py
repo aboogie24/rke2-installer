@@ -110,7 +110,7 @@ def setup_node(node, cfg, is_server, is_first_server=False):
 
         if is_server and is_first_server:
             # Wait for RKE2 to be fully operational
-            log_message(node, "Waiting for RKE2 to be ready before deploying kubectl...")
+            log_message(node, "Waiting for RKE2 to be ready before deploying kubectl and other tools...")
             stdin, stdout, stderr = ssh.exec_command(
                 "timeout 120 bash -c 'until [ -f /etc/rancher/rke2/rke2.yaml ]; do sleep 2; done'"
             )
@@ -119,8 +119,16 @@ def setup_node(node, cfg, is_server, is_first_server=False):
             if exit_code == 0:
                 log_message(node, "RKE2 configuration detected, deploying kubectl...")
                 deploy_kubectl(ssh, node, extract_path)
+                if 'extra_tools' in cfg and cfg['extra_tools']:
+                    log_message(node, f"Installing additional tools: {', '.join(cfg['extra_tools'])}")
+                    
+                    if 'k9s' in cfg['extra_tools']:
+                        install_k9s(ssh, node, extract_path)
             else:
                 log_warning(node, "Timed out waiting for RKE2 configuration, skipping kubectl deployment")
+            
+           
+                
 
         # exit_code = stdout.channel.recv_exit_status()
         # if exit_code == 0:
@@ -199,3 +207,38 @@ def deploy_kubectl(ssh, node, extract_path):
     else:
         err = stderr.read().decode()
         log_warning(node, "Kubectl installed but test command failed:", details=err)
+
+def install_k9s(ssh, node, extract_path):
+    """Install k9s CLI tool from the RKE2 bundle"""
+    log_message(node, "Installing k9s Kubernetes CLI tool...")
+    
+    # Check if k9s exists in the bundle
+    stdin, stdout, stderr = ssh.exec_command(f"test -f {extract_path}/bin/k9s && echo 'exists'")
+    if stdout.read().decode().strip() != 'exists':
+        log_warning(node, "k9s binary not found in bundle. Skipping installation.")
+        return False
+    
+    commands = [
+        f"sudo cp {extract_path}/bin/k9s /usr/local/bin/k9s",
+        "sudo chmod +x /usr/local/bin/k9s",
+        # "mkdir -p ~/.kube",
+        # "sudo cp /etc/rancher/rke2/rke2.yaml ~/.kube/config",
+        # "sudo chown $(id -u):$(id -g) ~/.kube/config",
+        # "chmod 600 ~/.kube/config",
+        "k9s version || echo 'k9s installed but version check failed'"
+    ]
+    
+    for cmd in commands:
+        log_message(node, "Executing:", details=cmd)
+        stdin, stdout, stderr = ssh.exec_command(cmd)
+        exit_code = stdout.channel.recv_exit_status()
+        if exit_code != 0:
+            err = stderr.read().decode()
+            log_warning(node, f"Command '{cmd}' may have issues:", details=err)
+        else:
+            output = stdout.read().decode().strip()
+            if output and 'version' in cmd:
+                log_message(node, "k9s version info:", details=output)
+    
+    log_success(node, "k9s Kubernetes UI tool installed successfully")
+    return True

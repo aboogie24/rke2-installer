@@ -81,6 +81,16 @@ sudo dnf download --resolve rke2-common rke2-server rke2-agent rke2-selinux
 # Download kubectl (optional if using the one included in rke2)
 curl -LO "https://dl.k8s.io/release/$(curl -Ls https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
 chmod +x kubectl
+
+# Download k9s 
+K9S_VERSION=$(curl -s https://api.github.com/repos/derailed/k9s/releases/latest | grep -oP '"tag_name": "\K(.*)(?=")')
+
+# Download the appropriate binary
+curl -Lo k9s.tar.gz https://github.com/derailed/k9s/releases/download/${K9S_VERSION}/k9s_Linux_amd64.tar.gz
+
+# Extract the binary
+tar -xzf k9s.tar.gz k9s
+chmod +x k9s
 ```
 
 ### Building the Bundle
