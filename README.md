@@ -41,13 +41,16 @@ mkdir -p rke2-airgap-bundle/{rke2,rpms,images,systemd}
 tar -xzf rke2.linux-amd64.tar.gz -C rke2-airgap-bundle/rke2
 
 # Extract RPMs
-tar -xzf rke2-rpm.tar.gz -C rke2-airgap-bundle/rpms
+cp rke2-agent-1.27.16~rke2r2-0.el8.x86_64.rpm rke2-airgap-bundle/rpms/.
+cp rke2-common-1.27.16~rke2r2-0.el8.x86_64.rpm rke2-airgap-bundle/rpms/.
+cp rke2-selinux-0.18-1.el8.noarch.rpm rke2-airgap-bundle/rpms/.
+cp rke2-server-1.27.16~rke2r2-0.el8.x86_64.rpm rke2-airgap-bundle/rpms/.
 
 # Move the airgap image tar into the structure
 mv rke2-airgap-images.tar rke2-airgap-bundle/images/
 
 # Copy systemd service files if you want them predefined (optional)
-cp rke2-airgap-bundle/rke2/share/systemd/rke2-*.service rke2-airgap-bundle/systemd/
+cp rke2-airgap-bundle/rke2/lib/systemd/system/rke2-*.service rke2-airgap-bundle/systemd/.
 
 # (Optional) Add install.sh
 cat <<EOF > rke2-airgap-bundle/install.sh
@@ -59,7 +62,15 @@ chmod +x rke2-airgap-bundle/install.sh
 ### Create Tarball
 Create this tarball from a machine online.... More information to follow
 ```
-tar -cvzf rke2-airgapped-bundle.tar.gz rke-airgapped-bundle/
+tar -cvzf rke2-airgap-bundle.tar.gz rke2-airgap-bundle/
 ```
 
 # rke2-installer
+
+Update the `config.yaml` file with the predefined token. 
+
+## How to Create the Token
+```
+openssl rand -hex 32
+```
+
