@@ -39,3 +39,37 @@ def write_server_config_yaml(ssh, node, is_first_server, cfg):
         log_success(node, "Dynamic server config.yaml written.")
     else:
         log_error(node, "Failed to write dynamic config.yaml:", details=stderr.read().decode())
+
+def configure_registry(ssh, node, cfg):
+    """Configure container registry settings including insecure registries"""
+    if 'registry' not in cfg.get('cluster', {}):
+        return
+
+    registry_config = cfg['cluster']['registry']
+    log_message(node, "Configuring container registry settings...")
+    
+    # Convert the registry config to YAML
+    registry_yaml = yaml.dump(registry_config, default_flow_style=False)
+    
+    # Create the registries.yaml file
+    registries_cmd = f"sudo mkdir -p /etc/rancher/rke2 && echo '{registry_yaml}' | sudo tee /etc/rancher/rke2/registries.yaml > /dev/null"
+    
+    log_message(node, "Creating registry configuration:")
+    log_message(node, "Registry config:", details=f"\n{registry_yaml}")
+    
+    stdin, stdout, stderr = ssh.exec_command(registries_cmd)
+    exit_code = stdout.channel.recv_exit_status()
+    
+    if exit_code == 0:
+        log_success(node, "Registry configuration created successfully")
+    else:
+        log_error(node, "Failed to create registry configuration:", details=stderr.read().decode())
+    
+    # Check if we're configuring insecure registries
+    insecure_registries = []
+    for registry, config in registry_config.get('configs', {}).items():
+        if config.get('tls', {}).get('insecure_skip_verify'):
+            insecure_registries.append(registry)
+    
+    if insecure_registries:
+        log_message(node, f"Configured insecure registries: {', '.join(insecure_registries)}")

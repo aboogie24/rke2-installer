@@ -33,7 +33,7 @@ def display_space_jam_logo4():
     {colorama.Fore.YELLOW}███████ ██      ██   ██  ██████ ███████ {colorama.Fore.MAGENTA}   ██████  ██   ██ ██      ██ 
 
     {colorama.Fore.WHITE}{colorama.Style.BRIGHT}       ★ {colorama.Fore.CYAN}RKE2 {colorama.Fore.WHITE}Airgapped Kubernetes {colorama.Fore.YELLOW}Deployment {colorama.Fore.CYAN}Tool{colorama.Fore.WHITE} ★       
-    {colorama.Fore.CYAN}{colorama.Style.BRIGHT}                Created by: {colorama.Fore.GREEN}the Astronaut(AB)                 
+    {colorama.Fore.CYAN}{colorama.Style.BRIGHT}                Created by: {colorama.Fore.GREEN}The Astronaut(AB)                 
 
     {colorama.Fore.CYAN}★ * ✧ ✦ * ✧ ★ ✦ * ✧ {colorama.Fore.WHITE}★{colorama.Fore.CYAN} ✦ * ✧ ★ ✦ * ✧ {colorama.Fore.WHITE}★{colorama.Fore.CYAN} ✦ * ✧ ★ ✦ * ✧ ★ * ✧
     """

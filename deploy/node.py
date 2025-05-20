@@ -3,7 +3,7 @@ import os
 import paramiko
 import colorama
 from .utils import log_message, log_error, log_success, log_warning
-from .config import write_server_config_yaml
+from .config import write_server_config_yaml, configure_registry
 from .systemd import configure_systemd
 
 
@@ -91,6 +91,9 @@ def setup_node(node, cfg, is_server, is_first_server=False):
         directory_contents = stdout.read().decode('utf-8')
         log_message(node, "Extracted contents:", details=f"\n{directory_contents}")
 
+        # Configure Registry
+        configure_registry(ssh, node, cfg)
+
         # Install RPMs
         log_message(node, "Installing RKE2 RPMs...")
         rpm_install_cmd = f"sudo yum install -y {extract_path}/rpm/*.rpm"
@@ -124,18 +127,13 @@ def setup_node(node, cfg, is_server, is_first_server=False):
                     
                     if 'k9s' in cfg['extra_tools']:
                         install_k9s(ssh, node, extract_path)
+                    if 'helm' in cfg['extra_tools']:
+                        install_helm(ssh, node, extract_path)
+                    if 'flux' in cfg['extra_tools']:
+                        install_flux(ssh, node, extract_path)
             else:
                 log_warning(node, "Timed out waiting for RKE2 configuration, skipping kubectl deployment")
             
-           
-                
-
-        # exit_code = stdout.channel.recv_exit_status()
-        # if exit_code == 0:
-        #     log_success(node, "RPMs installed successfully.")
-        # else:
-        #     error_output = stderr.read().decode()
-        #     log_error(node, "RPM installation failed:", details=f"\n{error_output}")
         
         sftp.close()
         ssh.close()
@@ -241,4 +239,79 @@ def install_k9s(ssh, node, extract_path):
                 log_message(node, "k9s version info:", details=output)
     
     log_success(node, "k9s Kubernetes UI tool installed successfully")
+    return True
+
+def install_helm(ssh, node, extract_path):
+    """Install Helm from the airgapped bundle"""
+    log_message(node, "Installing Helm package manager...")
+    
+    # Check if helm exists in the bundle
+    stdin, stdout, stderr = ssh.exec_command(f"test -f {extract_path}/bin/helm && echo 'exists'")
+    if stdout.read().decode().strip() != 'exists':
+        log_warning(node, "Helm binary not found in bundle. Skipping installation.")
+        return False
+    
+    commands = [
+        f"sudo cp {extract_path}/bin/helm /usr/local/bin/helm",
+        "sudo chmod +x /usr/local/bin/helm",
+        "helm version || echo 'Helm installed but version check failed'",
+        # Initialize Helm (optional)
+        "helm repo list || true"
+    ]
+    
+    for cmd in commands:
+        log_message(node, "Executing:", details=cmd)
+        stdin, stdout, stderr = ssh.exec_command(cmd)
+        exit_code = stdout.channel.recv_exit_status()
+        if exit_code != 0:
+            err = stderr.read().decode()
+            log_warning(node, f"Command '{cmd}' may have issues:", details=err)
+        else:
+            output = stdout.read().decode().strip()
+            if output and 'version' in cmd:
+                log_message(node, "Helm version info:", details=output)
+    
+    log_success(node, "Helm package manager installed successfully")
+    return True
+
+def install_flux(ssh, node, extract_path):
+    """Install Flux GitOps CLI from the airgapped bundle"""
+    log_message(node, "Installing Flux GitOps CLI...")
+    
+    # Check if flux exists in the bundle
+    stdin, stdout, stderr = ssh.exec_command(f"test -f {extract_path}/bin/flux && echo 'exists'")
+    if stdout.read().decode().strip() != 'exists':
+        log_warning(node, "Flux binary not found in bundle. Skipping installation.")
+        return False
+    
+    commands = [
+        f"sudo cp {extract_path}/bin/flux /usr/local/bin/flux",
+        "sudo chmod +x /usr/local/bin/flux",
+        "flux --version || echo 'Flux installed but version check failed'"
+    ]
+    
+    for cmd in commands:
+        log_message(node, "Executing:", details=cmd)
+        stdin, stdout, stderr = ssh.exec_command(cmd)
+        exit_code = stdout.channel.recv_exit_status()
+        if exit_code != 0:
+            err = stderr.read().decode()
+            log_warning(node, f"Command '{cmd}' may have issues:", details=err)
+        else:
+            output = stdout.read().decode().strip()
+            if output and 'version' in cmd:
+                log_message(node, "Flux version info:", details=output)
+    
+    # Add auto-completion (optional)
+    completion_cmds = [
+        "mkdir -p ~/.config/fish/completions",
+        "flux completion fish > ~/.config/fish/completions/flux.fish || true",
+        "echo 'source <(flux completion bash)' >> ~/.bashrc || true"
+    ]
+    
+    for cmd in completion_cmds:
+        stdin, stdout, stderr = ssh.exec_command(cmd)
+    
+    log_success(node, "Flux GitOps CLI installed successfully")
+    log_message(node, "Note: For a complete Flux installation in airgapped environments, manual bootstrap steps are required.")
     return True

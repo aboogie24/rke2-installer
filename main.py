@@ -21,7 +21,7 @@ def cli():
 
 @cli.command()
 @click.option('--config', '-c', required=True, help='Path to config.yml')
-@click.option('--extra-tools', '-e', multiple=True, 
+@click.option('--extra-tools', '-e', multiple=True, type=click.Choice(['k9s', 'helm', 'flux']),
               help='Install additional tools (specify multiple times for multiple tools, e.g., -e k9s -e helm)')
 def deploy(config, extra_tools):
     """Deploy RKE2 Cluster"""
@@ -53,7 +53,7 @@ def deploy(config, extra_tools):
     # Post-install health check
     for node in cfg['nodes']['servers']:
         post_install_health_check(node)
-            
+
     display_space_jam_logo4()
 
 

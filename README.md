@@ -91,6 +91,28 @@ curl -Lo k9s.tar.gz https://github.com/derailed/k9s/releases/download/${K9S_VERS
 # Extract the binary
 tar -xzf k9s.tar.gz k9s
 chmod +x k9s
+
+# Set the desired Helm version
+HELM_VERSION="v3.13.3"  # Update to the version you need
+
+# Download Helm
+curl -Lo helm.tar.gz https://get.helm.sh/helm-${HELM_VERSION}-linux-amd64.tar.gz
+
+# Extract the binary
+tar -zxvf helm.tar.gz
+
+# The binary is in linux-amd64/helm
+chmod +x linux-amd64/helm
+
+# Set desired Flux version
+FLUX_VERSION="2.1.2"  # Update to your preferred version
+
+# Download Flux CLI binary
+curl -Lo flux.tar.gz https://github.com/fluxcd/flux2/releases/download/v${FLUX_VERSION}/flux_${FLUX_VERSION}_linux_amd64.tar.gz
+
+# Extract the binary
+mkdir -p flux
+tar -xzf flux.tar.gz -C flux
 ```
 
 ### Building the Bundle

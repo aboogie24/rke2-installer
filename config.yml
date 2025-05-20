@@ -6,6 +6,17 @@ cluster:
   tar_extract_path: /opt/rke2
   systemd_service_path: /etc/systemd/system/ # Not using as of now
 
+  # Regsitry configuration
+  registry: 
+    mirrors:
+      "registry.example.com":
+        endpoints:
+          - "https://registry.example.com"
+    configs:
+      "registry.example.com":
+        tls:
+          insecure_skip_verify: true
+
   # Config yaml settings
   domain: example.com # Define a domain for your cluster
   token: K1078d6efc5ece52ed16e86a6d19bddfb222e89862efc74b7f9187f203fbc06fa00::server:a3dab4acb8829dedba9b7fe99966c153
@@ -47,3 +58,5 @@ nodes:
 
 extra_tools:
   - k9s
+  - helm
+  - flux
