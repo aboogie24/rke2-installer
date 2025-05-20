@@ -1,1 +1,3 @@
 .ssh
+pyvenv.cfg
+.venv
