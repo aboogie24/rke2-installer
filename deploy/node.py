@@ -107,12 +107,26 @@ def setup_node(node, cfg, is_server, is_first_server=False):
         log_message(node, f"Configuring systemd service for", details=f"{'server' if is_server else 'agent'}")
         configure_systemd(ssh, extract_path, is_server, server_ip, node)
 
-        exit_code = stdout.channel.recv_exit_status()
-        if exit_code == 0:
-            log_success(node, "RPMs installed successfully.")
-        else:
-            error_output = stderr.read().decode()
-            log_error(node, "RPM installation failed:", details=f"\n{error_output}")
+        if is_server and is_first_server:
+            # Wait for RKE2 to be fully operational
+            log_message(node, "Waiting for RKE2 to be ready before deploying kubectl...")
+            stdin, stdout, stderr = ssh.exec_command(
+                "timeout 120 bash -c 'until [ -f /etc/rancher/rke2/rke2.yaml ]; do sleep 2; done'"
+            )
+            exit_code = stdout.channel.recv_exit_status()
+            
+            if exit_code == 0:
+                log_message(node, "RKE2 configuration detected, deploying kubectl...")
+                deploy_kubectl(ssh, node, extract_path)
+            else:
+                log_warning(node, "Timed out waiting for RKE2 configuration, skipping kubectl deployment")
+
+        # exit_code = stdout.channel.recv_exit_status()
+        # if exit_code == 0:
+        #     log_success(node, "RPMs installed successfully.")
+        # else:
+        #     error_output = stderr.read().decode()
+        #     log_error(node, "RPM installation failed:", details=f"\n{error_output}")
         
         sftp.close()
         ssh.close()
@@ -137,3 +151,48 @@ def prepare_binary(ssh, node):
         if exit_code != 0:
             err = stderr.read().decode()
             log_error(node, f"Failed to run: {cmd}", details=err)
+
+def deploy_kubectl(ssh, node, extract_path):
+    """Deploy kubectl from the RKE2 bundle to the first server node"""
+    log_message(node, "Deploying kubectl from RKE2 bundle...")
+    
+    commands = [
+        # Copy kubectl binary to /usr/local/bin
+        f"sudo cp {extract_path}/bin/kubectl /usr/local/bin/kubectl",
+        # Make it executable
+        "sudo chmod +x /usr/local/bin/kubectl",
+        # Create symbolic link to the RKE2 kubeconfig for the current user
+        "mkdir -p $HOME/.kube",
+        "sudo cp /etc/rancher/rke2/rke2.yaml $HOME/.kube/config",
+        "sudo chown $(id -u):$(id -g) $HOME/.kube/config",
+        # Make kubectl usable for root as well
+        "sudo mkdir -p /root/.kube",
+        "sudo cp /etc/rancher/rke2/rke2.yaml /root/.kube/config",
+        # Test kubectl functionality
+        "kubectl version --client"
+    ]
+    
+    for cmd in commands:
+        log_message(node, "Executing:", details=cmd)
+        stdin, stdout, stderr = ssh.exec_command(cmd)
+        exit_code = stdout.channel.recv_exit_status()
+        
+        if exit_code != 0:
+            err = stderr.read().decode()
+            log_error(node, f"Failed to run: {cmd}", details=err)
+        else:
+            cmd_output = stdout.read().decode().strip()
+            if cmd_output and "version" in cmd:
+                log_message(node, "Kubectl version info:", details=f"\n{cmd_output}")
+    
+    # Verify kubectl works by getting nodes
+    log_message(node, "Verifying kubectl functionality...")
+    stdin, stdout, stderr = ssh.exec_command("kubectl get nodes")
+    exit_code = stdout.channel.recv_exit_status()
+    
+    if exit_code == 0:
+        nodes_output = stdout.read().decode()
+        log_success(node, "Kubectl successfully installed and configured:", details=f"\n{nodes_output}")
+    else:
+        err = stderr.read().decode()
+        log_warning(node, "Kubectl installed but test command failed:", details=err)
