@@ -6,6 +6,7 @@ from .utils import log_message, log_error, log_success, log_warning
 from .config import write_server_config_yaml
 from .systemd import configure_systemd
 
+
 def setup_node(node, cfg, is_server, is_first_server=False):
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
@@ -138,7 +139,7 @@ def prepare_binary(ssh, node):
     """Prepare the RKE2 binary and images directory"""
     log_message(node, "Preparing rke2 binary...")
     commands = [
-        "sudo cp /opt/rke2/bin/rke2 /usr/local/bin/rke2",
+        "sudo cp /opt/rke2/rke2/bin/rke2 /usr/local/bin/rke2",
         "sudo chmod +x /usr/local/bin/rke2",
         "sudo mkdir -p /var/lib/rancher/rke2/agent/images/",
         "sudo cp /opt/rke2/images/rke2-images.linux-amd64.tar.zst /var/lib/rancher/rke2/agent/images/",
@@ -159,6 +160,8 @@ def deploy_kubectl(ssh, node, extract_path):
     commands = [
         # Copy kubectl binary to /usr/local/bin
         f"sudo cp {extract_path}/bin/kubectl /usr/local/bin/kubectl",
+        # Update Path
+        "export PATH=/usr/local/bin:$PATH",
         # Make it executable
         "sudo chmod +x /usr/local/bin/kubectl",
         # Create symbolic link to the RKE2 kubeconfig for the current user

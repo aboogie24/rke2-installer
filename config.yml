@@ -1,13 +1,13 @@
 cluster:
   name: my-rke2-cluster
   version: v1.32.3
-  airgap_bundle_path: /opt/rke2-airgap-bundle.tar.gz
+  airgap_bundle_path: /opt/rke2-airgap-bundle.tar.gz # Note Store this on the machine you're running this tool from
   rke2_rpm_path: /opt/rke2/rpms
   tar_extract_path: /opt/rke2
-  systemd_service_path: /etc/systemd/system/
+  systemd_service_path: /etc/systemd/system/ # Not using as of now
 
   # Config yaml settings
-  domain: example.com
+  domain: example.com # Define a domain for your cluster
   token: K1078d6efc5ece52ed16e86a6d19bddfb222e89862efc74b7f9187f203fbc06fa00::server:a3dab4acb8829dedba9b7fe99966c153
   cluster_cidr: 10.42.0.0/16
   service_cidr: 10.43.0.0/16
