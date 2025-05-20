@@ -6,6 +6,7 @@ import os
 import colorama
 from pathlib import Path
 
+colorama.init(autoreset=True)
 serverToken=None
 
 def load_config(config_file):
@@ -23,12 +24,13 @@ def deploy(config):
     """Deploy RKE2 Cluster"""
     cfg = load_config(config)
 
-    click.echo(f"Deploying RKE2 cluster: {cfg['cluster']['name']}")
+    click.echo(colorama.Fore.CYAN + f"Deploying RKE2 cluster: " + colorama.Fore.YELLOW + f"{cfg['cluster']['name']}\n")
 
     # Server nodes
     for i, node in enumerate(cfg['nodes']['servers']):
         is_first_server = (i == 0)
-        click.echo(f"Setting up {'first' if is_first_server else 'joining'} server: {node['hostname']} ({node['ip']})")
+        click.echo(colorama.Fore.CYAN + f"Setting up {'first' if is_first_server else 'joining'} server: " + 
+                   colorama.Fore.YELLOW + f"{node['hostname']} " + colorama.Fore.MAGENTA + f"({node['ip']})\n")
         setup_node(node, cfg, is_server=True, is_first_server=is_first_server)
 
     # Agent nodes
@@ -54,7 +56,8 @@ def setup_node(node, cfg, is_server, is_first_server=False):
             click.echo(f"Error: Source file {cfg['cluster']['airgap_bundle_path']} does not exist!")
             return False
         
-        click.echo(f"Connecting to {node['hostname']} ({node['ip']})...")
+        click.echo(colorama.Fore.CYAN + f"Connecting to " + colorama.Fore.YELLOW + 
+                   f"{node['hostname']} " + colorama.Fore.MAGENTA + f"({node['ip']})...")
         ssh.connect(
             hostname=node['ip'],
             username=node['user'],
