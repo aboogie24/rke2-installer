@@ -315,3 +315,25 @@ def install_flux(ssh, node, extract_path):
     log_success(node, "Flux GitOps CLI installed successfully")
     log_message(node, "Note: For a complete Flux installation in airgapped environments, manual bootstrap steps are required.")
     return True
+
+def install_gpu_stack(ssh, node, nvidia_rpm_path):
+    log_message(node, "Installing NVIDIA driver (DKMS) and CUDA toolkit (offline)...")
+    
+    try:
+        
+        # Step 2: Install with dnf
+        commands = [
+            f"sudo dnf install -y {nvidia_rpm_path}/nvidia-rpms/*.rpm",
+            "sudo dracut --force"
+        ]
+        
+        for cmd in commands:
+            stdin, stdout, stderr = ssh.exec_command(cmd)
+            exit_code = stdout.channel.recv_exit_status()
+            if exit_code != 0:
+                log_warning(node, f"Warning during command '{cmd}':", details=stderr.read().decode())
+        
+        log_success(node, "NVIDIA GPU stack installed")
+    
+    except Exception as e:
+        log_error(node, "Failed to install NVIDIA GPU stack", details=str(e))

@@ -3,7 +3,7 @@ import click
 import yaml
 import colorama
 import paramiko
-from deploy.node import setup_node
+from deploy.node import setup_node, install_gpu_stack
 from deploy.health import post_install_health_check
 from deploy.utils import log_message, log_error, log_success, log_warning
 from logo.space_jam_logo import display_animated_logo, display_space_jam_logo4
@@ -44,11 +44,24 @@ def deploy(config, extra_tools):
                    colorama.Fore.MAGENTA + f"({node['ip']})")
         setup_node(node, cfg, is_server=True, is_first_server=is_first_server)
 
+
     # Agent nodes
     for node in cfg['nodes']['agents']:
         click.echo(colorama.Fore.CYAN + f"[" + colorama.Fore.YELLOW + f"{node['hostname']}" + colorama.Fore.CYAN + 
                   f"] Setting up agent " + colorama.Fore.MAGENTA + f"({node['ip']})")
         setup_node(node, cfg, is_server=False)
+
+        # GPU Enabled Agent ? 
+        if node.get("gpu_enabled", False):
+            ssh = paramiko.SSHClient()
+            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            ssh.connect(
+                hostname=node["ip"],
+                username=node["user"],
+                key_filename=node["ssh_key"]
+            )
+            install_gpu_stack(ssh, node, cfg['cluster']['nvidia_rpm_path'])
+            ssh.close()
     
     # Post-install health check
     for node in cfg['nodes']['servers']:

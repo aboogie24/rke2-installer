@@ -4,6 +4,7 @@ cluster:
   airgap_bundle_path: /opt/rke2-airgap-bundle.tar.gz # Note Store this on the machine you're running this tool from
   rke2_rpm_path: /opt/rke2/rpms
   tar_extract_path: /opt/rke2
+  nvidia_rpm_path: /opt/nvidia_rpm
   systemd_service_path: /etc/systemd/system/ # Not using as of now
 
   # Regsitry configuration
@@ -51,6 +52,7 @@ nodes:
       ip: 10.0.4.177
       user: root
       ssh_key: .ssh/rke2_cluster_key
+      gpu_enabled: False # set to true if agent has a gpu
     # - hostname: rke2-agent-2
     #   ip: 192.168.1.21
     #   user: root
