@@ -1,339 +1,170 @@
-import click
-import os
 import paramiko
-import colorama
 from .utils import log_message, log_error, log_success, log_warning
-from .config import write_server_config_yaml, configure_registry
-from .systemd import configure_systemd
 
-
-def setup_node(node, cfg, is_server, is_first_server=False):
-    ssh = paramiko.SSHClient()
-    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-
-    # Depending on how big the bundle is change this path
-    remote_bundle_path = "/tmp/rke2-airgap-bundle.tar.gz"
-    extract_path = cfg['cluster']['tar_extract_path']
-
+def setup_node(node, config, dist_handler, os_handler, is_server=False, is_first_server=False):
+    """Setup a node with the specified distribution and OS handlers"""
+    
     try:
-        if not os.path.exists(cfg['cluster']['airgap_bundle_path']): 
-            log_error(node, f"Error: Source file {cfg['cluster']['airgap_bundle_path']} does not exist!")
-            return False
+        # Establish SSH connection
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
         
-        log_message(node, "Connecting to", details=f"{node['ip']}...")
+        log_message(f"Connecting to {node['hostname']} ({node['ip']})...")
         ssh.connect(
-            hostname=node['ip'],
-            username=node['user'],
-            key_filename=node['ssh_key']
+            hostname=node["ip"],
+            username=node["user"],
+            key_filename=node["ssh_key"],
+            timeout=30
         )
-
-        log_message(node, "Opening SFTP connection...")
-        sftp = ssh.open_sftp()
-
-        # Get file size for progress tracking
-        file_size = os.path.getsize(cfg['cluster']['airgap_bundle_path'])
-        log_message(node, "Uploading", details=f"{file_size/1024/1024:.2f} MB")
-
-        # Upload with progress callback for large files
-        def progress_callback(transferred, total):
-            percentage = (transferred / total) * 100
-            if percentage % 10 < 0.1:  # Report every ~10%
-                log_message(node, "Transfer progress:", details=f"{percentage:.1f}% ({transferred/1024/1024:.2f} MB)")
-
-        # Perform the actual file transfer
-        sftp.put(
-            cfg['cluster']['airgap_bundle_path'], 
-            remote_bundle_path,
-            callback=progress_callback if file_size > 10*1024*1024 else None  # Only use callback for files >10MB
-        )
-
-        # Verify the file exists on the remote system
-        try:
-            sftp.stat(remote_bundle_path)
-            log_success(node, "Successfully uploaded bundle")
-            
-        except IOError:
-            log_error(node, "Failed to verify file on remote system!")
-            return False
         
-        # First, check the content structure of the tar file
-        log_message(node, "Checking tar file structure...")
-        stdin, stdout, stderr = ssh.exec_command(f"tar -tf {remote_bundle_path} | head -10")
-        tar_contents = stdout.read().decode('utf-8')
-        log_message(node, "Tar contents (first 10 entries):", details=f"\n{tar_contents}")
-
-        # Create the target directory and ensure permissions
-        log_message(node, "Creating extraction directory...")
-        stdin, stdout, stderr = ssh.exec_command(f"sudo mkdir -p {extract_path}")
-        err = stderr.read().decode('utf-8')
-        if err:
-            log_error(node, "Error creating directory:", details=err)
-
-        # Extract preserving path structure but without top-level directory
-        extract_cmd = f"sudo tar -xzf {remote_bundle_path} --strip-components=1 -C {extract_path}"
-        log_message(node, "Extracting bundle...")
+        # Step 1: OS-level preparation
+        log_message("Step 1: Preparing operating system...")
         
-        # Execute with output capture
-        stdin, stdout, stderr = ssh.exec_command(extract_cmd)
+        # Get packages from config if specified
+        packages = config.get('packages', {}).get(os_handler.get_os_name(), {}).get('base_packages')
         
-        # Wait for command to complete and show output
-        extraction_output = stdout.read().decode('utf-8')
-        extraction_error = stderr.read().decode('utf-8')
-
-        if extraction_error:
-            log_error(node, "Error during extraction:", details=extraction_error)
-            return False
-        else:
-            log_success(node, "Extraction completed successfully")
-            
-        # Verify extraction by listing the target directory
-        stdin, stdout, stderr = ssh.exec_command(f"ls -la {extract_path}")
-        directory_contents = stdout.read().decode('utf-8')
-        log_message(node, "Extracted contents:", details=f"\n{directory_contents}")
-
-        # Configure Registry
-        configure_registry(ssh, node, cfg)
-
-        # Install RPMs
-        log_message(node, "Installing RKE2 RPMs...")
-        rpm_install_cmd = f"sudo yum install -y {extract_path}/rpm/*.rpm"
-        stdin, stdout, stderr = ssh.exec_command(rpm_install_cmd)
-
-        prepare_binary(ssh, node)
-
-        server_ip = cfg['nodes']['servers'][0]['ip']
-
+        if not os_handler.install_base_packages(ssh, packages):
+            raise Exception("Failed to install base packages")
+        
+        if not os_handler.disable_swap(ssh):
+            raise Exception("Failed to disable swap")
+        
+        if not os_handler.configure_kernel_modules(ssh):
+            raise Exception("Failed to configure kernel modules")
+        
+        if not os_handler.configure_selinux(ssh):
+            raise Exception("Failed to configure SELinux/AppArmor")
+        
+        if not os_handler.configure_firewall(ssh, 'server' if is_server else 'agent'):
+            raise Exception("Failed to configure firewall")
+        
+        # Step 2: Container runtime installation
+        log_message("Step 2: Installing container runtime...")
+        
+        runtime = config['deployment'].get('vanilla_k8s', {}).get('container_runtime', 'containerd')
+        if not os_handler.install_container_runtime(ssh, runtime):
+            raise Exception("Failed to install container runtime")
+        
+        # Step 3: Distribution-specific preparation
+        log_message("Step 3: Preparing for Kubernetes distribution...")
+        
         if is_server:
-            log_message(node, "Writing RKE2 config.yaml...")
-            write_server_config_yaml(ssh, node, is_first_server, cfg)
-
-        # After RPM install
-        log_message(node, f"Configuring systemd service for", details=f"{'server' if is_server else 'agent'}")
-        configure_systemd(ssh, extract_path, is_server, server_ip, node)
-
-        if is_server and is_first_server:
-            # Wait for RKE2 to be fully operational
-            log_message(node, "Waiting for RKE2 to be ready before deploying kubectl and other tools...")
-            stdin, stdout, stderr = ssh.exec_command(
-                "timeout 120 bash -c 'until [ -f /etc/rancher/rke2/rke2.yaml ]; do sleep 2; done'"
-            )
-            exit_code = stdout.channel.recv_exit_status()
-            
-            if exit_code == 0:
-                log_message(node, "RKE2 configuration detected, deploying kubectl...")
-                deploy_kubectl(ssh, node, extract_path)
-                if 'extra_tools' in cfg and cfg['extra_tools']:
-                    log_message(node, f"Installing additional tools: {', '.join(cfg['extra_tools'])}")
-                    
-                    if 'k9s' in cfg['extra_tools']:
-                        install_k9s(ssh, node, extract_path)
-                    if 'helm' in cfg['extra_tools']:
-                        install_helm(ssh, node, extract_path)
-                    if 'flux' in cfg['extra_tools']:
-                        install_flux(ssh, node, extract_path)
-            else:
-                log_warning(node, "Timed out waiting for RKE2 configuration, skipping kubectl deployment")
-            
+            if not dist_handler.prepare_server_node(ssh, config, is_first_server):
+                raise Exception("Failed to prepare server node")
+        else:
+            if not dist_handler.prepare_agent_node(ssh, config):
+                raise Exception("Failed to prepare agent node")
         
-        sftp.close()
+        # Step 4: Install Kubernetes distribution
+        log_message("Step 4: Installing Kubernetes distribution...")
+        
+        node_type = 'server' if is_server else 'agent'
+        if not dist_handler.install_distribution(ssh, config, node_type):
+            raise Exception("Failed to install Kubernetes distribution")
+        
+        # Step 5: Start services
+        log_message("Step 5: Starting services...")
+        
+        if not dist_handler.start_services(ssh, node_type):
+            raise Exception("Failed to start services")
+        
+        # Step 6: Install extra tools (if specified and this is a server)
+        if is_server and 'extra_tools' in config:
+            log_message("Step 6: Installing extra tools...")
+            install_extra_tools(ssh, config['extra_tools'], os_handler)
+        
         ssh.close()
-
-    except Exception as e:
-        log_error(node, "Error setting up node:", details=str(e))
-
-def prepare_binary(ssh, node):
-    """Prepare the RKE2 binary and images directory"""
-    log_message(node, "Preparing rke2 binary...")
-    commands = [
-        "sudo cp /opt/rke2/rke2/bin/rke2 /usr/local/bin/rke2",
-        "sudo chmod +x /usr/local/bin/rke2",
-        "sudo mkdir -p /var/lib/rancher/rke2/agent/images/",
-        "sudo cp /opt/rke2/images/rke2-images.linux-amd64.tar.zst /var/lib/rancher/rke2/agent/images/",
-        "sudo chmod 644 /var/lib/rancher/rke2/agent/images/rke2-images.linux-amd64.tar.zst"
-    ]
-    for cmd in commands:
-        log_message(node, "Executing:", details=cmd)
-        stdin, stdout, stderr = ssh.exec_command(cmd)
-        exit_code = stdout.channel.recv_exit_status()
-        if exit_code != 0:
-            err = stderr.read().decode()
-            log_error(node, f"Failed to run: {cmd}", details=err)
-
-def deploy_kubectl(ssh, node, extract_path):
-    """Deploy kubectl from the RKE2 bundle to the first server node"""
-    log_message(node, "Deploying kubectl from RKE2 bundle...")
-    
-    commands = [
-        # Copy kubectl binary to /usr/local/bin
-        f"sudo cp {extract_path}/bin/kubectl /usr/local/bin/kubectl",
-        # Update Path
-        "export PATH=/usr/local/bin:$PATH",
-        # Make it executable
-        "sudo chmod +x /usr/local/bin/kubectl",
-        # Create symbolic link to the RKE2 kubeconfig for the current user
-        "mkdir -p $HOME/.kube",
-        "sudo cp /etc/rancher/rke2/rke2.yaml $HOME/.kube/config",
-        "sudo chown $(id -u):$(id -g) $HOME/.kube/config",
-        # Make kubectl usable for root as well
-        "sudo mkdir -p /root/.kube",
-        "sudo cp /etc/rancher/rke2/rke2.yaml /root/.kube/config",
-        # Test kubectl functionality
-        "kubectl version --client"
-    ]
-    
-    for cmd in commands:
-        log_message(node, "Executing:", details=cmd)
-        stdin, stdout, stderr = ssh.exec_command(cmd)
-        exit_code = stdout.channel.recv_exit_status()
+        log_success(f"✅ Node {node['hostname']} setup completed successfully")
+        return True
         
-        if exit_code != 0:
-            err = stderr.read().decode()
-            log_error(node, f"Failed to run: {cmd}", details=err)
-        else:
-            cmd_output = stdout.read().decode().strip()
-            if cmd_output and "version" in cmd:
-                log_message(node, "Kubectl version info:", details=f"\n{cmd_output}")
-    
-    # Verify kubectl works by getting nodes
-    log_message(node, "Verifying kubectl functionality...")
-    stdin, stdout, stderr = ssh.exec_command("kubectl get nodes")
-    exit_code = stdout.channel.recv_exit_status()
-    
-    if exit_code == 0:
-        nodes_output = stdout.read().decode()
-        log_success(node, "Kubectl successfully installed and configured:", details=f"\n{nodes_output}")
-    else:
-        err = stderr.read().decode()
-        log_warning(node, "Kubectl installed but test command failed:", details=err)
-
-def install_k9s(ssh, node, extract_path):
-    """Install k9s CLI tool from the RKE2 bundle"""
-    log_message(node, "Installing k9s Kubernetes CLI tool...")
-    
-    # Check if k9s exists in the bundle
-    stdin, stdout, stderr = ssh.exec_command(f"test -f {extract_path}/bin/k9s && echo 'exists'")
-    if stdout.read().decode().strip() != 'exists':
-        log_warning(node, "k9s binary not found in bundle. Skipping installation.")
+    except Exception as e:
+        log_error(f"❌ Failed to setup node {node['hostname']}: {str(e)}")
+        if 'ssh' in locals():
+            ssh.close()
         return False
-    
-    commands = [
-        f"sudo cp {extract_path}/bin/k9s /usr/local/bin/k9s",
-        "sudo chmod +x /usr/local/bin/k9s",
-        # "mkdir -p ~/.kube",
-        # "sudo cp /etc/rancher/rke2/rke2.yaml ~/.kube/config",
-        # "sudo chown $(id -u):$(id -g) ~/.kube/config",
-        # "chmod 600 ~/.kube/config",
-        "k9s version || echo 'k9s installed but version check failed'"
-    ]
-    
-    for cmd in commands:
-        log_message(node, "Executing:", details=cmd)
-        stdin, stdout, stderr = ssh.exec_command(cmd)
-        exit_code = stdout.channel.recv_exit_status()
-        if exit_code != 0:
-            err = stderr.read().decode()
-            log_warning(node, f"Command '{cmd}' may have issues:", details=err)
-        else:
-            output = stdout.read().decode().strip()
-            if output and 'version' in cmd:
-                log_message(node, "k9s version info:", details=output)
-    
-    log_success(node, "k9s Kubernetes UI tool installed successfully")
-    return True
 
-def install_helm(ssh, node, extract_path):
-    """Install Helm from the airgapped bundle"""
-    log_message(node, "Installing Helm package manager...")
-    
-    # Check if helm exists in the bundle
-    stdin, stdout, stderr = ssh.exec_command(f"test -f {extract_path}/bin/helm && echo 'exists'")
-    if stdout.read().decode().strip() != 'exists':
-        log_warning(node, "Helm binary not found in bundle. Skipping installation.")
-        return False
-    
-    commands = [
-        f"sudo cp {extract_path}/bin/helm /usr/local/bin/helm",
-        "sudo chmod +x /usr/local/bin/helm",
-        "helm version || echo 'Helm installed but version check failed'",
-        # Initialize Helm (optional)
-        "helm repo list || true"
-    ]
-    
-    for cmd in commands:
-        log_message(node, "Executing:", details=cmd)
-        stdin, stdout, stderr = ssh.exec_command(cmd)
-        exit_code = stdout.channel.recv_exit_status()
-        if exit_code != 0:
-            err = stderr.read().decode()
-            log_warning(node, f"Command '{cmd}' may have issues:", details=err)
-        else:
-            output = stdout.read().decode().strip()
-            if output and 'version' in cmd:
-                log_message(node, "Helm version info:", details=output)
-    
-    log_success(node, "Helm package manager installed successfully")
-    return True
-
-def install_flux(ssh, node, extract_path):
-    """Install Flux GitOps CLI from the airgapped bundle"""
-    log_message(node, "Installing Flux GitOps CLI...")
-    
-    # Check if flux exists in the bundle
-    stdin, stdout, stderr = ssh.exec_command(f"test -f {extract_path}/bin/flux && echo 'exists'")
-    if stdout.read().decode().strip() != 'exists':
-        log_warning(node, "Flux binary not found in bundle. Skipping installation.")
-        return False
-    
-    commands = [
-        f"sudo cp {extract_path}/bin/flux /usr/local/bin/flux",
-        "sudo chmod +x /usr/local/bin/flux",
-        "flux --version || echo 'Flux installed but version check failed'"
-    ]
-    
-    for cmd in commands:
-        log_message(node, "Executing:", details=cmd)
-        stdin, stdout, stderr = ssh.exec_command(cmd)
-        exit_code = stdout.channel.recv_exit_status()
-        if exit_code != 0:
-            err = stderr.read().decode()
-            log_warning(node, f"Command '{cmd}' may have issues:", details=err)
-        else:
-            output = stdout.read().decode().strip()
-            if output and 'version' in cmd:
-                log_message(node, "Flux version info:", details=output)
-    
-    # Add auto-completion (optional)
-    completion_cmds = [
-        "mkdir -p ~/.config/fish/completions",
-        "flux completion fish > ~/.config/fish/completions/flux.fish || true",
-        "echo 'source <(flux completion bash)' >> ~/.bashrc || true"
-    ]
-    
-    for cmd in completion_cmds:
-        stdin, stdout, stderr = ssh.exec_command(cmd)
-    
-    log_success(node, "Flux GitOps CLI installed successfully")
-    log_message(node, "Note: For a complete Flux installation in airgapped environments, manual bootstrap steps are required.")
-    return True
-
-def install_gpu_stack(ssh, node, nvidia_rpm_path):
-    log_message(node, "Installing NVIDIA driver (DKMS) and CUDA toolkit (offline)...")
-    
+def install_gpu_stack(node, config, os_handler):
+    """Install GPU stack on a node"""
     try:
+        ssh = paramiko.SSHClient()
+        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+        ssh.connect(
+            hostname=node["ip"],
+            username=node["user"],
+            key_filename=node["ssh_key"]
+        )
         
-        # Step 2: Install with dnf
-        commands = [
-            f"sudo dnf install -y {nvidia_rpm_path}/nvidia-rpms/*.rpm",
-            "sudo dracut --force"
-        ]
+        log_message(f"Installing GPU stack on {node['hostname']}...")
         
-        for cmd in commands:
-            stdin, stdout, stderr = ssh.exec_command(cmd)
-            exit_code = stdout.channel.recv_exit_status()
-            if exit_code != 0:
-                log_warning(node, f"Warning during command '{cmd}':", details=stderr.read().decode())
+        # Get GPU packages from config if specified
+        gpu_packages = config.get('packages', {}).get(os_handler.get_os_name(), {}).get('gpu_packages')
         
-        log_success(node, "NVIDIA GPU stack installed")
-    
+        if not os_handler.install_gpu_packages(ssh, gpu_packages):
+            raise Exception("Failed to install GPU packages")
+        
+        ssh.close()
+        log_success(f"✅ GPU stack installed on {node['hostname']}")
+        return True
+        
     except Exception as e:
-        log_error(node, "Failed to install NVIDIA GPU stack", details=str(e))
+        log_error(f"❌ Failed to install GPU stack on {node['hostname']}: {str(e)}")
+        if 'ssh' in locals():
+            ssh.close()
+        return False
+
+def install_extra_tools(ssh_client, tools, os_handler):
+    """Install extra tools like k9s, helm, flux"""
+    log_message("Installing extra tools...")
+    
+    for tool in tools:
+        try:
+            if tool == 'k9s':
+                install_k9s(ssh_client, os_handler)
+            elif tool == 'helm':
+                install_helm(ssh_client, os_handler)
+            elif tool == 'flux':
+                install_flux(ssh_client, os_handler)
+            else:
+                log_warning(f"Unknown tool: {tool}")
+                
+        except Exception as e:
+            log_error(f"Failed to install {tool}: {str(e)}")
+
+def install_k9s(ssh_client, os_handler):
+    """Install k9s"""
+    from .utils import run_ssh_command
+    
+    commands = [
+        "curl -sL https://github.com/derailed/k9s/releases/latest/download/k9s_Linux_amd64.tar.gz | tar xzf - -C /tmp",
+        "install -m 755 /tmp/k9s /usr/local/bin/k9s",
+        "rm -f /tmp/k9s"
+    ]
+    
+    for cmd in commands:
+        if not run_ssh_command(ssh_client, cmd):
+            raise Exception(f"Failed to execute: {cmd}")
+
+def install_helm(ssh_client, os_handler):
+    """Install Helm"""
+    from .utils import run_ssh_command
+    
+    commands = [
+        "curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash"
+    ]
+    
+    for cmd in commands:
+        if not run_ssh_command(ssh_client, cmd):
+            raise Exception(f"Failed to execute: {cmd}")
+
+def install_flux(ssh_client, os_handler):
+    """Install Flux CLI"""
+    from .utils import run_ssh_command
+    
+    commands = [
+        "curl -s https://fluxcd.io/install.sh | bash",
+        "install -m 755 ~/.local/bin/flux /usr/local/bin/flux || install -m 755 ./flux /usr/local/bin/flux"
+    ]
+    
+    for cmd in commands:
+        if not run_ssh_command(ssh_client, cmd):
+            raise Exception(f"Failed to execute: {cmd}")

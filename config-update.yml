@@ -1,0 +1,205 @@
+# Enhanced configuration for airgapped environments
+deployment:
+  # Kubernetes distribution choice
+  k8s_distribution: "rke2"  # Options: rke2, eks-anywhere, vanilla, k3s, kubeadm
+  
+  # Operating system configuration
+  os:
+    type: "rhel"  # Options: rhel, ubuntu, centos, rocky, debian
+    version: "8"  # OS version
+    
+  # Airgap configuration - critical for disconnected environments
+  airgap:
+    enabled: true
+    local_registry: "registry.internal.local:5000"
+    registry_mirror: true
+    bundle_staging_path: "/opt/k8s-bundles"  # Local staging area
+    image_staging_path: "/opt/container-images"
+    
+  # Distribution-specific configurations for airgapped setup
+  rke2:
+    version: v1.32.3
+    airgap_bundle_path: /opt/k8s-bundles/rke2-airgap-bundle.tar.gz
+    images_bundle_path: /opt/k8s-bundles/rke2-images.linux-amd64.tar.gz
+    rpm_bundle_path: /opt/k8s-bundles/rke2-rpms.tar.gz
+    binary_bundle_path: /opt/k8s-bundles/rke2.linux-amd64.tar.gz
+    install_script_path: /opt/k8s-bundles/install.sh
+    systemd_service_path: /etc/systemd/system/
+    
+  eks_anywhere:
+    version: "v0.18.0"
+    bundle_path: "/opt/k8s-bundles/eks-anywhere-bundle.tar.gz"
+    cluster_spec_path: "/opt/eks-anywhere/cluster.yaml"
+    images_bundle_path: "/opt/k8s-bundles/eks-anywhere-images.tar.gz"
+    
+  vanilla_k8s:
+    version: "v1.32.3"
+    container_runtime: "containerd"
+    cni_plugin: "calico"
+    kubeadm_bundle_path: "/opt/k8s-bundles/kubeadm-bundle.tar.gz"
+    images_bundle_path: "/opt/k8s-bundles/k8s-images.tar.gz"
+    
+  k3s:
+    version: "v1.32.3+k3s1"
+    datastore: "sqlite"
+    binary_path: "/opt/k8s-bundles/k3s"
+    images_bundle_path: "/opt/k8s-bundles/k3s-airgap-images-amd64.tar.gz"
+
+cluster:
+  name: my-airgapped-cluster
+  domain: internal.local
+  token: K1078d6efc5ece52ed16e86a6d19bddfb222e89862efc74b7f9187f203fbc06fa00::server:a3dab4acb8829dedba9b7fe99966c153
+  cluster_cidr: 10.42.0.0/16
+  service_cidr: 10.43.0.0/16
+  
+  # Registry configuration for airgapped environments
+  registry: 
+    mirrors:
+      "*":  # Redirect all registry requests to local registry
+        endpoints:
+          - "https://registry.internal.local:5000"
+      "docker.io":
+        endpoints:
+          - "https://registry.internal.local:5000/docker.io"
+      "quay.io":
+        endpoints:
+          - "https://registry.internal.local:5000/quay.io"
+      "gcr.io":
+        endpoints:
+          - "https://registry.internal.local:5000/gcr.io"
+      "k8s.gcr.io":
+        endpoints:
+          - "https://registry.internal.local:5000/k8s.gcr.io"
+      "registry.k8s.io":
+        endpoints:
+          - "https://registry.internal.local:5000/registry.k8s.io"
+    configs:
+      "registry.internal.local:5000":
+        tls:
+          insecure_skip_verify: true
+        auth:
+          username: "registry-user"
+          password: "registry-password"
+  
+  # CNI configuration
+  cni:
+    - multus
+    - canal
+  disable_network_policy: false
+  write_kubeconfig_mode: "0644"
+  
+  # Components to disable (useful in airgapped environments)
+  disable:
+    - rke2-ingress-nginx  # Often replaced with custom ingress
+
+nodes:
+  servers:
+    - hostname: k8s-server-1
+      ip: 10.0.4.10
+      user: k8s-admin  # Non-root user with sudo privileges
+      ssh_key: .ssh/cluster_key
+      sudo_password: ""  # Empty if passwordless sudo, or use vault/env var
+      # Staging paths on this specific node
+      staging_paths:
+        bundles: "/home/k8s-admin/staging/bundles"
+        images: "/home/k8s-admin/staging/images"
+
+  agents:
+    - hostname: k8s-agent-1
+      ip: 10.0.4.177
+      user: k8s-admin
+      ssh_key: .ssh/cluster_key
+      sudo_password: ""
+      gpu_enabled: false
+      staging_paths:
+        bundles: "/home/k8s-admin/staging/bundles"
+        images: "/home/k8s-admin/staging/images"
+      labels:
+        node-role.kubernetes.io/worker: "true"
+        environment: "production"
+
+# OS-specific package bundles for airgapped installation
+packages:
+  rhel:
+    # Staged package bundles (RPMs packaged for offline installation)
+    bundle_path: "/opt/k8s-bundles/rhel8-packages.tar.gz"
+    base_packages:
+      - container-selinux
+      - iptables
+      - libnetfilter_conntrack
+      - libnfnetlink
+      - libnftnl
+      - libseccomp
+    gpu_packages:
+      - nvidia-container-toolkit
+      - nvidia-container-runtime
+    gpu_bundle_path: "/opt/k8s-bundles/nvidia-packages-rhel8.tar.gz"
+      
+  ubuntu:
+    bundle_path: "/opt/k8s-bundles/ubuntu20-packages.tar.gz"
+    base_packages:
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - gnupg
+      - lsb-release
+      - iptables
+    gpu_packages:
+      - nvidia-container-toolkit
+      - nvidia-container-runtime
+    gpu_bundle_path: "/opt/k8s-bundles/nvidia-packages-ubuntu20.tar.gz"
+
+# Local tools and utilities for airgapped environments
+tools:
+  # Tools that need to be staged locally
+  staging_area: "/opt/k8s-bundles/tools"
+  k9s:
+    version: "v0.27.4"
+    binary_path: "/opt/k8s-bundles/tools/k9s"
+  helm:
+    version: "v3.12.0"
+    tarball_path: "/opt/k8s-bundles/tools/helm-v3.12.0-linux-amd64.tar.gz"
+  flux:
+    version: "v2.0.1"
+    binary_path: "/opt/k8s-bundles/tools/flux"
+
+# Security and access configuration for airgapped environments
+security:
+  # SSH configuration
+  ssh:
+    strict_host_key_checking: false  # For internal networks
+    connection_timeout: 30
+    command_timeout: 600  # Longer timeout for package installations
+    
+  # Sudo configuration
+  sudo:
+    preserve_env: true
+    required_vars: ["PATH", "HOME"]
+    
+  # Certificate management for internal registries
+  certificates:
+    ca_bundle_path: "/opt/certs/internal-ca-bundle.crt"
+    registry_certs_path: "/opt/certs/registry"
+
+# Pre-flight validation for airgapped environments
+validation:
+  required_bundles:
+    - rke2-airgap-bundle.tar.gz
+    - rke2-images.linux-amd64.tar.gz
+    - container-runtime-bundle.tar.gz
+  required_tools:
+    - docker  # For loading images
+    - tar
+    - gzip
+  network_checks:
+    - registry.internal.local:5000
+    - ntp.internal.local  # Internal NTP server
+  disk_space_requirements:
+    staging_area: "10GB"
+    var_lib_rancher: "50GB"
+    var_lib_docker: "100GB"
+
+extra_tools:
+  - k9s
+  - helm
+  - flux

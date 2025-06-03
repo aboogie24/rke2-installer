@@ -17,7 +17,7 @@ def load_config(config_file):
 
 @click.group()
 def cli():
-    """RKE2 Airgapped Deployment CLI"""
+    """Space Jam Deployment CLI"""
     pass
 
 @cli.command()
@@ -36,6 +36,8 @@ def deploy(config, extra_tools):
                    colorama.Fore.YELLOW + f"{', '.join(extra_tools)}")
 
     click.echo(colorama.Fore.CYAN + f"Deploying RKE2 cluster: " + colorama.Fore.YELLOW + f"{cfg['cluster']['name']}\n")
+
+
 
     # Server nodes
     for i, node in enumerate(cfg['nodes']['servers']):
