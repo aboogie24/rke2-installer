@@ -1,5 +1,5 @@
 from .base_handler import BaseDistributionHandler
-from ..utils import log_message, log_error, log_success, run_ssh_command
+from ..utils import log_message, log_error, log_success, log_debug, log_warning, run_ssh_command
 from ..airgap.bundle_manager import BundleManager
 import tempfile
 import os
@@ -150,14 +150,17 @@ class AirgappedRKE2Handler(BaseDistributionHandler):
             return False
         
         install_cmds = [
-            f"ls -la /tmp/rke2-airgap-bundle", 
-            
+            f"ls -la /tmp/rke2-airgap-bundle",
+            f"echo {config[]}"
+
         ]
 
         for cmd in install_cmds:
             if not run_ssh_command(ssh_client, cmd):
                 log_error(f"Failed to install RKE2: {cmd}")
                 return False
+            else: 
+                log_debug(f"Test")
         
         # # Make install script executable and run it
         # install_script = f"{bundles_path}/install.sh"
@@ -349,4 +352,4 @@ class AirgappedRKE2Handler(BaseDistributionHandler):
         for cmd in commands:
             run_ssh_command(ssh_client, cmd)  # Don't fail on errors during cleanup
         
-        return True
+        return True 
