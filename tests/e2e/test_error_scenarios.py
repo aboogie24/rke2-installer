@@ -57,7 +57,6 @@ class TestErrorScenarios:
             
             result = runner.invoke(cli, ['deploy', '-c', 'bad-config.yml'])
             
-            
             assert "Unsupported Kubernetes distribution" in result.output
     
     def test_missing_required_bundles(self):

@@ -17,7 +17,7 @@ from uninstall.uninstall_cluster import uninstall_cluster
 colorama.init(autoreset=True)
 
 # Supported configurations for airgapped environments
-SUPPORTED_DISTRIBUTIONS = ['rke2', 'eks-anywhere', 'vanilla', 'k3s', 'kubeadm']
+SUPPORTED_DISTRIBUTIONS = ['rke2', 'eks-a', 'vanilla', 'k3s', 'kubeadm']
 SUPPORTED_OS = ['rhel', 'ubuntu', 'centos', 'rocky', 'debian']
 
 def load_config(config_file):
@@ -252,9 +252,9 @@ def get_airgapped_distribution_handler(distribution):
     if distribution == 'rke2':
         from deploy.distributions.airgapped_rke2_handler import AirgappedRKE2Handler
         return AirgappedRKE2Handler()
-    elif distribution == 'k3s':
-        from deploy.distributions.airgapped_k3s_handler import AirgappedK3sHandler
-        return AirgappedK3sHandler()
+    elif distribution == 'eks-a':
+        from deploy.distributions.eks_anywhere_handler import EKSAnywhereHandler
+        return EKSAnywhereHandler()
     else:
         # For other distributions, use regular handlers for now
         return get_distribution_handler(distribution)

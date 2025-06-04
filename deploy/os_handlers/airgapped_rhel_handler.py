@@ -1,13 +1,13 @@
 from .base_handler import BaseOSHandler
-from ..utils import log_message, log_error, log_success, run_ssh_command
+from ..utils import log_message, log_error, log_warning, run_ssh_command
 import os
 
 class AirgappedRHELHandler(BaseOSHandler):
     """Handler for RHEL in airgapped environments with non-root user"""
     
-    def install_base_packages(self, ssh_client, packages=None):
+    def install_base_packages(self, ssh_client, node, packages=None):
         """Install base packages from local bundle"""
-        log_message("Installing base packages for RHEL (airgapped)...")
+        log_message(node, "Installing base packages for RHEL (airgapped)...")
         
         # Check if we have a package bundle to work with
         bundle_path = "/tmp/k8s-bundles/rhel8-packages.tar.gz"
@@ -16,6 +16,7 @@ class AirgappedRHELHandler(BaseOSHandler):
             return True
         
         # Extract and install packages from bundle
+        # Will need to update this in the future
         extract_commands = [
             f"cd /tmp && tar -xzf {bundle_path}",
             "cd /tmp/rhel8-packages && sudo dnf install -y *.rpm --nogpgcheck"
@@ -150,9 +151,9 @@ class AirgappedRHELHandler(BaseOSHandler):
         log_message("Skipping Kubernetes repository setup (airgapped environment)")
         return True
     
-    def disable_swap(self, ssh_client):
+    def disable_swap(self, ssh_client, node):
         """Disable swap with sudo privileges"""
-        log_message("Disabling swap...")
+        log_message(node, "Disabling swap...")
         
         commands = [
             "sudo swapoff -a",

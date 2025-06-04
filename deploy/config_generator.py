@@ -137,7 +137,7 @@ def generate_sample_config(distribution='rke2', os_type='rhel', airgapped=True, 
             'systemd_service_path': '/etc/systemd/system/'
         }
         
-    elif distribution == 'eks-anywhere':
+    elif distribution == 'eks-a':
         config['deployment']['eks_anywhere'] = {
             'version': 'v0.18.0',
             'bundle_path': '/opt/k8s-bundles/eks-anywhere-bundle.tar.gz',

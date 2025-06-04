@@ -18,15 +18,15 @@ def setup_node(node, config, dist_handler, os_handler, is_server=False, is_first
         )
         
         # Step 1: OS-level preparation
-        log_message("Step 1: Preparing operating system...")
+        log_message(node, "Step 1: Preparing operating system...")
         
         # Get packages from config if specified
         packages = config.get('packages', {}).get(os_handler.get_os_name(), {}).get('base_packages')
         
-        if not os_handler.install_base_packages(ssh, packages):
+        if not os_handler.install_base_packages(ssh, node, packages):
             raise Exception("Failed to install base packages")
         
-        if not os_handler.disable_swap(ssh):
+        if not os_handler.disable_swap(ssh, node):
             raise Exception("Failed to disable swap")
         
         if not os_handler.configure_kernel_modules(ssh):
