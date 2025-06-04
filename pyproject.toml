@@ -1,0 +1,108 @@
+# For pip install -e .[dev,test]
+
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "airgapped-k8s-deployer"
+version = "1.0.0"
+description = "Multi-distribution Kubernetes deployment tool for airgapped environments"
+authors = [{name = "Your Name", email = "your.email@example.com"}]
+readme = "README.md"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+keywords = ["kubernetes", "deployment", "airgapped", "rke2", "automation"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: System Administrators",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: System :: Systems Administration",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+dependencies = [
+    "click>=8.1.0",
+    "PyYAML>=6.0.1",
+    "colorama>=0.4.6",
+    "paramiko>=3.3.1",
+    "cryptography>=41.0.4",
+    "pynacl>=1.5.0",
+    "requests>=2.31.0",
+    "python-dateutil>=2.8.2",
+    "pytz>=2023.3",
+]
+
+[project.optional-dependencies]
+dev = [
+    "black>=23.7.0",
+    "isort>=5.12.0",
+    "flake8>=6.1.0",
+    "pylint>=2.17.5",
+    "mypy>=1.5.1",
+    "ipdb>=0.13.13",
+    "ipython>=8.15.0",
+    "sphinx>=7.1.2",
+    "sphinx-rtd-theme>=1.3.0",
+]
+
+test = [
+    "pytest>=7.4.0",
+    "pytest-cov>=4.1.0",
+    "pytest-mock>=3.11.1",
+    "pytest-xdist>=3.3.1",
+    "pytest-html>=3.2.0",
+    "pytest-timeout>=2.1.0",
+    "pytest-benchmark>=4.0.0",
+    "coverage[toml]>=7.3.0",
+    "responses>=0.23.3",
+    "factory-boy>=3.3.0",
+    "faker>=19.6.2",
+    "freezegun>=1.2.2",
+    "pyfakefs>=5.2.4",
+    "psutil>=5.9.5",
+    "memory-profiler>=0.61.0",
+    "docker>=6.1.3",
+    "kubernetes>=27.2.0",
+    "bandit>=1.7.5",
+    "safety>=2.3.4",
+    "parameterized>=0.9.0",
+    "testfixtures>=7.2.0",
+]
+
+security = [
+    "bandit>=1.7.5",
+    "safety>=2.3.4",
+    "pip-audit>=2.6.1",
+]
+
+docs = [
+    "sphinx>=7.1.2",
+    "sphinx-rtd-theme>=1.3.0",
+    "doc8>=1.1.1",
+    "myst-parser>=2.0.0",
+]
+
+performance = [
+    "locust>=2.16.1",
+    "py-spy>=0.3.14",
+    "line-profiler>=4.1.1",
+]
+
+all = [
+    "airgapped-k8s-deployer[dev,test,security,docs,performance]"
+]
+
+[project.scripts]
+k8s-deploy = "main:cli"
+
+[project.urls]
+Homepage = "https://github.com/yourusername/airgapped-k8s-deployer"
+Documentation = "https://airgapped-k8s-deployer.readthedocs.io/"
+Repository = "https://github.com/yourusername/airgapped-k8s-deployer.git"
+"Bug Tracker" = "https://github.com/yourusername/airgapped-k8s-deployer/issues"

@@ -1,0 +1,255 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  PYTHON_VERSION: '3.9'
+
+jobs:
+  lint:
+    name: Code Linting
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install flake8 pylint mypy black isort
+        pip install -r requirements-test.txt
+    
+    - name: Run linting
+      run: |
+        flake8 main.py deploy/ tests/ --max-line-length=120 --count --statistics
+        pylint main.py deploy/ --disable=C0103,R0903,R0913,W0613 --score=no
+    
+    - name: Check code formatting
+      run: |
+        black --check main.py deploy/ tests/ --line-length=120
+        isort --check-only main.py deploy/ tests/ --profile black
+
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.8', '3.9', '3.10', '3.11']
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements-test.txt
+        pip install -e .
+    
+    - name: Run unit tests
+      run: |
+        pytest tests/unit/ -v \
+          --cov=deploy --cov=main \
+          --cov-report=xml:coverage.xml \
+          --junit-xml=test-results/unit-tests.xml
+    
+    - name: Upload coverage to Codecov
+      if: matrix.python-version == '3.9'
+      uses: codecov/codecov-action@v3
+      with:
+        file: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+    
+    - name: Upload test results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: unit-test-results-${{ matrix.python-version }}
+        path: test-results/
+
+  e2e-tests:
+    name: End-to-End Tests
+    runs-on: ubuntu-latest
+    needs: [lint, unit-tests]
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements-test.txt
+        pip install -e .
+    
+    - name: Create test bundles
+      run: |
+        mkdir -p /tmp/test-bundles
+        echo "mock bundle" > /tmp/test-bundles/rke2-airgap-bundle.tar.gz
+        echo "mock images" > /tmp/test-bundles/rke2-images.tar.gz
+        echo "#!/bin/bash\necho 'mock install'" > /tmp/test-bundles/install.sh
+        chmod +x /tmp/test-bundles/install.sh
+    
+    - name: Run E2E tests
+      run: |
+        pytest tests/e2e/ -v \
+          --junit-xml=test-results/e2e-tests.xml \
+          -m "not integration and not slow"
+    
+    - name: Upload test results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: e2e-test-results
+        path: test-results/
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: [unit-tests]
+    services:
+      registry:
+        image: registry:2
+        ports:
+          - 5000:5000
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements-test.txt
+        pip install -e .
+    
+    - name: Wait for registry
+      run: |
+        timeout 30 bash -c 'until curl -f http://localhost:5000/v2/; do sleep 1; done'
+    
+    - name: Run integration tests
+      run: |
+        pytest tests/e2e/ -v \
+          --junit-xml=test-results/integration-tests.xml \
+          -m "integration"
+    
+    - name: Upload test results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: integration-test-results
+        path: test-results/
+
+  performance-tests:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+    needs: [unit-tests]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements-test.txt
+        pip install -e .
+    
+    - name: Run performance tests
+      run: |
+        pytest tests/e2e/ -v \
+          --junit-xml=test-results/performance-tests.xml \
+          -m "slow"
+    
+    - name: Upload test results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: performance-test-results
+        path: test-results/
+
+  security-scan:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install safety bandit
+        pip install -r requirements-test.txt
+    
+    - name: Run safety check
+      run: safety check
+    
+    - name: Run bandit security check
+      run: bandit -r main.py deploy/ -f json -o bandit-report.json
+    
+    - name: Upload security results
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: security-scan-results
+        path: bandit-report.json
+
+  build-test:
+    name: Build Test
+    runs-on: ubuntu-latest
+    needs: [lint, unit-tests, e2e-tests]
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+    
+    - name: Install build dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install build twine
+    
+    - name: Build package
+      run: python -m build
+    
+    - name: Check package
+      run: twine check dist/*
+    
+    - name: Upload build artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: build-artifacts
+        path: dist/

@@ -1,0 +1,27 @@
+version: 2
+updates:
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    target-branch: "develop"
+    reviewers:
+      - "yourusername"
+    commit-message:
+      prefix: "deps"
+      include: "scope"
+    groups:
+      pytest:
+        patterns:
+          - "pytest*"
+      linting:
+        patterns:
+          - "black"
+          - "flake8*"
+          - "pylint"
+          - "mypy"
+      security:
+        patterns:
+          - "bandit"
+          - "safety"
+          - "cryptography"

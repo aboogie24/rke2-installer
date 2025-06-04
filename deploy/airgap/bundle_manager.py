@@ -1,3 +1,4 @@
+# deploy/airgap/bundle_manager.py
 import os
 import tarfile
 import tempfile
@@ -12,7 +13,7 @@ class BundleManager:
         
     def stage_bundles_to_node(self, ssh_client, node, node_type):
         """Stage all required bundles to a node"""
-        log_message(f"Staging bundles to {node['hostname']}...")
+        log_message(node, f"Staging bundles to {node['hostname']}...")
         
         # Create staging directories on remote node
         staging_paths = node.get('staging_paths', {})
@@ -54,7 +55,7 @@ class BundleManager:
                 remote_path = f"{staging_path}/{filename}"
                 
                 if not self._upload_file(ssh_client, local_path, remote_path):
-                    log_error(f"Failed to upload {filename}")
+                    log_error(node, f"Failed to upload {filename}")
                     return False
         
         return True
@@ -74,7 +75,7 @@ class BundleManager:
                 remote_path = f"{staging_path}/{filename}"
                 
                 if not self._upload_file(ssh_client, local_path, remote_path):
-                    log_error(f"Failed to upload {filename}")
+                    log_error(node, f"Failed to upload {filename}")
                     return False
         
         return True
@@ -100,3 +101,4 @@ class BundleManager:
         except Exception as e:
             log_error(f"Failed to upload {local_path}: {e}")
             return False
+

@@ -1,0 +1,21 @@
+# Minimal dependencies for CI/CD pipelines
+
+-r requirements.txt
+
+# Essential testing
+pytest>=7.4.0
+pytest-cov>=4.1.0
+pytest-xdist>=3.3.1
+coverage[toml]>=7.3.0
+
+# Code quality (minimal set)
+black>=23.7.0
+flake8>=6.1.0
+bandit>=1.7.5
+
+# Essential mocking
+pytest-mock>=3.11.1
+responses>=0.23.3
+
+# System monitoring for CI
+psutil>=5.9.5

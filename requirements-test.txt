@@ -1,0 +1,38 @@
+# Complete testing stack (includes dev deps)
+
+-r requirements-dev.txt
+
+# Core Testing Framework
+pytest>=7.4.0                   # Main testing framework
+pytest-cov>=4.1.0              # Coverage reporting
+pytest-mock>=3.11.1            # Enhanced mocking
+pytest-xdist>=3.3.1            # Parallel execution
+pytest-html>=3.2.0             # HTML reports
+pytest-timeout>=2.1.0          # Test timeouts
+pytest-benchmark>=4.0.0        # Performance benchmarking
+
+# Test Coverage
+coverage[toml]>=7.3.0          # Coverage with TOML support
+
+# Mocking and Test Data
+responses>=0.23.3              # HTTP mocking
+factory-boy>=3.3.0             # Test data generation
+faker>=19.6.2                  # Fake data
+freezegun>=1.2.2               # Time manipulation
+pyfakefs>=5.2.4                # Fake filesystem
+
+# Performance Testing
+psutil>=5.9.5                  # System monitoring
+memory-profiler>=0.61.0        # Memory profiling
+
+# Integration Testing
+docker>=6.1.3                  # Docker API
+kubernetes>=27.2.0             # Kubernetes client
+
+# Security Testing
+bandit>=1.7.5                  # Security scanning
+safety>=2.3.4                  # Vulnerability checking
+
+# Test Utilities
+parameterized>=0.9.0           # Parameterized tests
+testfixtures>=7.2.0            # Enhanced fixtures

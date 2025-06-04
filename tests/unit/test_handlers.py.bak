@@ -1,0 +1,161 @@
+# tests/unit/test_handlers.py - Updated unit tests for distribution and OS handlers
+import pytest
+from unittest.mock import Mock, patch, MagicMock
+import os
+import tempfile
+
+# Mock the missing modules before importing handlers
+@pytest.fixture(autouse=True)
+def mock_missing_modules():
+    """Mock modules that might not exist during testing"""
+    with patch.dict('sys.modules', {
+        'deploy.airgap.bundle_manager': MagicMock(),
+        'deploy.utils': MagicMock(),
+    }):
+        yield
+
+class TestAirgappedRKE2Handler:
+    """Test RKE2 handler for airgapped environments"""
+    
+    @pytest.fixture
+    def handler(self):
+        # Mock the dependencies first
+        with patch('deploy.distributions.airgapped_rke2_handler.BundleManager'):
+            with patch('deploy.distributions.airgapped_rke2_handler.log_message'):
+                with patch('deploy.distributions.airgapped_rke2_handler.log_error'):
+                    with patch('deploy.distributions.airgapped_rke2_handler.run_ssh_command'):
+                        from deploy.distributions.airgapped_rke2_handler import AirgappedRKE2Handler
+                        return AirgappedRKE2Handler()
+    
+    def test_validate_requirements_success(self, handler, sample_config, mock_bundle_files):
+        """Test successful requirements validation"""
+        # Update config with real bundle paths
+        rke2_config = sample_config['deployment']['rke2']
+        rke2_config['airgap_bundle_path'] = str(mock_bundle_files / "rke2-airgap-bundle.tar.gz")
+        rke2_config['images_bundle_path'] = str(mock_bundle_files / "rke2-images.tar.gz")
+        rke2_config['install_script_path'] = str(mock_bundle_files / "install.sh")
+        
+        result = handler.validate_requirements(sample_config)
+        assert result is True
+    
+    def test_validate_requirements_missing_bundle(self, handler, sample_config):
+        """Test validation failure with missing bundles"""
+        # Point to non-existent files
+        rke2_config = sample_config['deployment']['rke2']
+        rke2_config['airgap_bundle_path'] = '/nonexistent/bundle.tar.gz'
+        
+        result = handler.validate_requirements(sample_config)
+        assert result is False
+    
+    def test_generate_config_files_server(self, handler, sample_config):
+        """Test server configuration file generation"""
+        config_content = handler.generate_config_files(sample_config, 'server', is_first_server=True)
+        
+        assert "cluster-cidr: 10.42.0.0/16" in config_content
+        assert "service-cidr: 10.43.0.0/16" in config_content
+        assert "token: test-token" in config_content
+        assert "system-default-registry: localhost:5000" in config_content
+    
+    def test_generate_config_files_agent(self, handler, sample_config):
+        """Test agent configuration file generation"""
+        config_content = handler.generate_config_files(sample_config, 'agent')
+        
+        assert "server: https://10.0.4.10:9345" in config_content
+        assert "token: test-token" in config_content
+        assert "system-default-registry: localhost:5000" in config_content
+    
+    @patch('deploy.utils.run_ssh_command')
+    def test_prepare_server_node(self, mock_run_cmd, handler, sample_config, mock_ssh_client):
+        """Test server node preparation"""
+        mock_run_cmd.return_value = True
+        handler.bundle_manager = Mock()
+        handler.bundle_manager.stage_bundles_to_node.return_value = True
+        
+        with patch.object(handler, '_upload_config_file', return_value=True):
+            with patch.object(handler, '_get_current_node', return_value=sample_config['nodes']['servers'][0]):
+                result = handler.prepare_server_node(mock_ssh_client, sample_config, is_first_server=True)
+                assert result is True
+                
+                # Verify directories were created
+                assert mock_run_cmd.call_count >= 2
+
+class TestAirgappedRHELHandler:
+    """Test RHEL handler for airgapped environments"""
+    
+    @pytest.fixture
+    def handler(self):
+        with patch('deploy.os_handlers.airgapped_rhel_handler.log_message'):
+            with patch('deploy.os_handlers.airgapped_rhel_handler.log_error'):
+                with patch('deploy.os_handlers.airgapped_rhel_handler.run_ssh_command'):
+                    from deploy.os_handlers.airgapped_rhel_handler import AirgappedRHELHandler
+                    return AirgappedRHELHandler()
+    
+    @patch('deploy.utils.run_ssh_command')
+    def test_install_base_packages(self, mock_run_cmd, handler, mock_ssh_client):
+        """Test base package installation"""
+        mock_run_cmd.return_value = True
+        
+        with patch.object(handler, '_check_remote_file_exists', return_value=True):
+            result = handler.install_base_packages(mock_ssh_client)
+            assert result is True
+            assert mock_run_cmd.call_count >= 2
+    
+    @patch('deploy.utils.run_ssh_command')
+    def test_configure_firewall(self, mock_run_cmd, handler, mock_ssh_client):
+        """Test firewall configuration"""
+        # Mock firewalld as active
+        mock_run_cmd.side_effect = [
+            ("active", "", 0),  # systemctl is-active firewalld
+            True, True, True, True, True  # firewall-cmd commands
+        ]
+        mock_run_cmd.return_value = True
+        
+        result = handler.configure_firewall(mock_ssh_client, 'server')
+        assert result is True
+    
+    @patch('deploy.utils.run_ssh_command')
+    def test_disable_swap(self, mock_run_cmd, handler, mock_ssh_client):
+        """Test swap disabling"""
+        mock_run_cmd.return_value = True
+        
+        result = handler.disable_swap(mock_ssh_client)
+        assert result is True
+        assert mock_run_cmd.call_count == 2
+
+class TestBundleManager:
+    """Test bundle management functionality"""
+    
+    @pytest.fixture
+    def bundle_manager(self, sample_config):
+        with patch('deploy.airgap.bundle_manager.log_message'):
+            with patch('deploy.airgap.bundle_manager.log_error'):
+                with patch('deploy.airgap.bundle_manager.run_ssh_command'):
+                    from deploy.airgap.bundle_manager import BundleManager
+                    return BundleManager(sample_config)
+    
+    @patch('deploy.utils.run_ssh_command')
+    def test_stage_bundles_to_node(self, mock_run_cmd, bundle_manager, mock_ssh_client, sample_config):
+        """Test bundle staging to node"""
+        mock_run_cmd.return_value = True
+        node = sample_config['nodes']['servers'][0]
+        
+        with patch.object(bundle_manager, '_stage_rke2_bundles', return_value=True):
+            result = bundle_manager.stage_bundles_to_node(mock_ssh_client, node, 'server')
+            assert result is True
+    
+    @patch('deploy.utils.run_ssh_command')
+    def test_upload_file(self, mock_run_cmd, bundle_manager, mock_ssh_client, tmp_path):
+        """Test file upload functionality"""
+        mock_run_cmd.return_value = True
+        
+        # Create a test file
+        test_file = tmp_path / "test_file.txt"
+        test_file.write_text("test content")
+        
+        mock_sftp = Mock()
+        mock_ssh_client.open_sftp.return_value = mock_sftp
+        
+        result = bundle_manager._upload_file(mock_ssh_client, str(test_file), "/remote/path")
+        assert result is True
+        mock_sftp.put.assert_called_once()
+

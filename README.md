@@ -268,6 +268,192 @@ If you prefer to install manually instead of using the CLI:
 - **Networking Issues**: Ensure firewall rules allow RKE2 ports (6443, 9345, 10250, 8472)
 - **Node Token Issues**: Manually retrieve the node token from a server with `cat /var/lib/rancher/rke2/server/node-token`
 
+
+
+
+🧪 Testing Structure:
+
+Test Organization:
+tests/
+├── conftest.py                    # Pytest configuration & fixtures
+├── unit/                          # Fast, isolated unit tests
+│   ├── test_config_validation.py
+│   ├── test_handlers.py
+│   └── test_utils.py
+├── e2e/                           # End-to-end & integration tests
+│   ├── test_deployment_workflow.py
+│   ├── test_error_scenarios.py
+│   └── test_performance.py
+├── scenarios/                     # Real-world test scenarios
+│   ├── test_real_world_scenarios.py
+│   └── test_security_scenarios.py
+└── utils/                         # Test utilities & helpers
+    ├── mock_helpers.py
+    ├── test_fixtures.py
+    ├── assertions.py
+    ├── performance_helpers.py
+    └── docker_helpers.py
+
+Test Categories:
+
+Unit Tests: Fast, isolated component testing
+Integration Tests: External dependency testing (Docker registry)
+End-to-End Tests: Complete workflow testing
+Performance Tests: Load and performance validation
+Security Tests: Security-focused scenarios
+
+
+
+🛠️ Key Features:
+
+Mock Utilities:
+
+MockSSHClient: Simulates SSH operations without real connections
+MockBundleEnvironment: Creates mock bundle files for testing
+mock_ssh_environment(): Context manager for SSH mocking
+mock_bundle_environment(): Context manager for bundle mocking
+
+
+Custom Assertions:
+
+assert_command_executed(): Verify SSH commands were run
+assert_file_uploaded(): Verify SFTP file transfers
+assert_config_contains(): Validate configuration values
+assert_log_contains(): Check log output
+
+
+Performance Testing:
+
+PerformanceMonitor: Track execution time and memory usage
+benchmark_function(): Benchmark function performance
+Load testing with large cluster configurations
+
+
+Docker Integration:
+
+DockerRegistry: Manage test Docker registries
+docker_registry(): Context manager for registry testing
+push_test_image(): Create and push test container images
+
+
+
+🚀 Automation & CI/CD:
+
+Makefile Targets:
+bashmake test              # Run all tests
+make test-unit         # Unit tests only
+make test-e2e          # E2E tests
+make test-integration  # Integration tests (requires Docker)
+make coverage          # Generate coverage report
+make lint              # Code linting
+make format            # Code formatting
+
+GitHub Actions Pipeline:
+
+Multi-version Python testing (3.8-3.11)
+Code quality checks (flake8, pylint, black)
+Security scanning (bandit, safety)
+Coverage reporting with Codecov
+Parallel test execution
+
+
+Test Configuration:
+
+Pytest markers for test categorization
+Parameterized tests for multiple scenarios
+Fixtures for reusable test data
+Coverage requirements and reporting
+
+
+
+📋 Real-World Test Scenarios:
+
+Deployment Scenarios:
+
+High-availability multi-server clusters
+Mixed OS deployments (RHEL + Ubuntu)
+GPU-enabled worker nodes
+Large-scale clusters (100+ nodes)
+
+
+Failure Scenarios:
+
+SSH connection failures
+Missing bundle files
+Permission denied errors
+Partial deployment rollbacks
+
+
+Security Scenarios:
+
+Non-root user validation
+SSH key permission checking
+Registry authentication testing
+Root user migration warnings
+
+
+Performance Scenarios:
+
+Large configuration loading
+Concurrent bundle staging simulation
+Memory usage monitoring
+
+
+
+🔧 Usage Examples:
+bash# Setup test environment
+make setup-test-env
+source venv-test/bin/activate
+
+# Run quick smoke tests
+make test-smoke
+
+# Run full test suite with coverage
+make coverage
+
+# Run specific test scenarios
+pytest tests/scenarios/test_real_world_scenarios.py::TestRealWorldScenarios::test_multi_server_ha_deployment -v
+
+# Run performance tests
+pytest -m slow
+
+# Debug specific test
+pytest tests/unit/test_config_validation.py::TestConfigValidation::test_valid_config --pdb
+📊 Test Coverage & Quality:
+
+Comprehensive Coverage: Unit, integration, E2E, and performance tests
+Mock-Heavy Design: No real SSH connections or external dependencies in unit tests
+Realistic Scenarios: Tests based on actual airgapped deployment patterns
+Performance Validation: Ensures deployments complete within reasonable time limits
+Security Focus: Validates secure deployment practices
+CI/CD Ready: Automated testing pipeline with quality gates
+
+
+
+# Installation Examples:
+
+# Basic installation
+pip install -r requirements.txt
+
+# Development setup
+pip install -r requirements-dev.txt
+# or with pyproject.toml:
+pip install -e .[dev]
+
+# Testing setup
+pip install -r requirements-test.txt
+# or with pyproject.toml:
+pip install -e .[test]
+
+# CI/CD setup (minimal)
+pip install -r requirements-ci.txt
+
+# Full development setup
+pip install -e .[all]
+
+# Security-focused installation
+pip install -e .[security]
+
 ---
 
 Created by: the Astronaut(AB)

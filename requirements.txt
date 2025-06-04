@@ -1,9 +1,15 @@
-# Core dependencies
-click>=8.1.3         # Command-line interface creation toolkit
-PyYAML>=6.0          # YAML parser and emitter
-colorama>=0.4.6      # Cross-platform colored terminal text
-paramiko>=3.0.0      # SSH implementation for Python
+# Core application dependencies for production deployment
 
-# Optional dependencies (uncomment if needed)
-# pyfiglet>=0.8.post1  # ASCII art text banner generation
-# cryptography>=41.0.0  # Required by paramiko for newer crypto methods
+click>=8.1.0                    # CLI framework
+PyYAML>=6.0.1                   # YAML configuration parsing
+colorama>=0.4.6                 # Colored terminal output
+paramiko>=3.3.1                 # SSH client for remote connections
+
+# Security and encryption
+cryptography>=41.0.4            # Cryptographic functions
+pynacl>=1.5.0                   # Networking and cryptography
+
+# Utilities
+requests>=2.31.0                # HTTP requests for registry operations
+python-dateutil>=2.8.2          # Date utilities
+pytz>=2023.3                    # Timezone handling
