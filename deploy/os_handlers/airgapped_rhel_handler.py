@@ -2,6 +2,18 @@ from .base_handler import BaseOSHandler
 from ..utils import log_message, log_error, log_warning, run_ssh_command
 import os
 
+
+""" 
+This handler is designed to setup nodes running 
+RHEL/CENTOS 
+
+Notes:  Commands may need some adjusting to run on STIG'd 
+        Machines. Using /opt directory should work as it 
+
+Possible solution: 'echo <Non root Pass> | sudo -S <command>' 
+
+"""
+
 class AirgappedRHELHandler(BaseOSHandler):
     """Handler for RHEL in airgapped environments with non-root user"""
     
@@ -60,7 +72,7 @@ class AirgappedRHELHandler(BaseOSHandler):
         
         return True
     
-    def configure_firewall(self, ssh_client, node_type):
+    def configure_firewall(self, ssh_client, node_type, node):
         """Configure firewall with sudo privileges"""
         log_message("Configuring firewall (airgapped)...")
         
@@ -69,7 +81,7 @@ class AirgappedRHELHandler(BaseOSHandler):
             "sudo systemctl is-active firewalld", return_output=True)
         
         if exit_code != 0:
-            log_message("Firewalld is not running, skipping firewall configuration")
+            log_message(node,"Firewalld is not running, skipping firewall configuration")
             return True
         
         firewall_commands = []
@@ -101,14 +113,14 @@ class AirgappedRHELHandler(BaseOSHandler):
         
         for cmd in firewall_commands:
             if not run_ssh_command(ssh_client, cmd):
-                log_error(f"Failed to configure firewall: {cmd}")
+                log_error(node, f"Failed to configure firewall: {cmd}")
                 return False
         
         return True
     
-    def configure_selinux(self, ssh_client):
+    def configure_selinux(self, ssh_client, node):
         """Configure SELinux with sudo privileges"""
-        log_message("Configuring SELinux (airgapped)...")
+        log_message(node, "Configuring SELinux (airgapped)...")
         
         commands = [
             "sudo setenforce 0",
@@ -117,7 +129,7 @@ class AirgappedRHELHandler(BaseOSHandler):
         
         for cmd in commands:
             if not run_ssh_command(ssh_client, cmd):
-                log_error(f"Failed to configure SELinux: {cmd}")
+                log_error(node, f"Failed to configure SELinux: {cmd}")
                 return False
         
         return True
@@ -167,7 +179,7 @@ class AirgappedRHELHandler(BaseOSHandler):
         
         return True
     
-    def configure_kernel_modules(self, ssh_client):
+    def configure_kernel_modules(self, ssh_client, node):
         """Load required kernel modules with sudo"""
         log_message("Configuring kernel modules...")
         
@@ -176,17 +188,19 @@ class AirgappedRHELHandler(BaseOSHandler):
         # Load modules immediately
         for module in modules:
             if not run_ssh_command(ssh_client, f"sudo modprobe {module}"):
-                log_error(f"Failed to load module: {module}")
+                log_error(node, f"Failed to load module: {module}")
                 return False
         
         # Make modules persistent
+        # This command may not working in STIG'd airgapped environments
         modules_content = '\n'.join(modules)
         create_modules_cmd = f"echo '{modules_content}' | sudo tee /etc/modules-load.d/k8s.conf"
         
         if not run_ssh_command(ssh_client, create_modules_cmd):
-            log_error("Failed to create kernel modules configuration")
+            log_error(node, "Failed to create kernel modules configuration")
             return False
         
+        # This should be updated
         # Configure sysctl
         sysctl_content = """net.bridge.bridge-nf-call-ip6tables = 1
 net.bridge.bridge-nf-call-iptables = 1
@@ -195,12 +209,12 @@ net.ipv4.ip_forward = 1"""
         create_sysctl_cmd = f"echo '{sysctl_content}' | sudo tee /etc/sysctl.d/k8s.conf"
         
         if not run_ssh_command(ssh_client, create_sysctl_cmd):
-            log_error("Failed to create sysctl configuration")
+            log_error(node, "Failed to create sysctl configuration")
             return False
         
         # Apply sysctl settings
         if not run_ssh_command(ssh_client, "sudo sysctl --system"):
-            log_error("Failed to apply sysctl settings")
+            log_error(node, "Failed to apply sysctl settings")
             return False
         
         return True

@@ -105,6 +105,8 @@ def cli():
     """Multi-Distribution Kubernetes Airgapped Deployment CLI"""
     pass
 
+
+
 @cli.command()
 @click.option('--config', '-c', required=True, help='Path to config.yml')
 @click.option('--extra-tools', '-e', multiple=True, type=click.Choice(['k9s', 'helm', 'flux']),
@@ -127,6 +129,7 @@ def deploy(config, extra_tools, dry_run, skip_validation, stage_only):
         cfg['extra_tools'] = list(extra_tools)
         click.echo(colorama.Fore.CYAN + "Extra tools to be installed: " + 
                    colorama.Fore.YELLOW + f"{', '.join(extra_tools)}")
+        
 
     deployment = cfg['deployment']
     k8s_dist = deployment.get('k8s_distribution', 'rke2')
@@ -341,14 +344,15 @@ def show_deployment_plan(cfg):
         click.echo(f"    - {node['hostname']} ({user_info}) - {gpu_status} - {node_os['type']} {node_os['version']}")
     
     # Show bundle locations
+    # *Update*
     if airgap_enabled:
         click.echo(f"\n  Required Bundles:")
         if k8s_dist == 'rke2':
             rke2_config = deployment.get('rke2', {})
             bundles = [
-                ('Airgap Bundle', rke2_config.get('airgap_bundle_path')),
-                ('Images Bundle', rke2_config.get('images_bundle_path')),
-                ('Install Script', rke2_config.get('install_script_path'))
+                ('Airgap Bundle', rke2_config.get('airgap_bundle_path'))
+                # ('Images Bundle', rke2_config.get('images_bundle_path')),
+                # ('Install Script', rke2_config.get('install_script_path'))
             ]
             for name, path in bundles:
                 if path:

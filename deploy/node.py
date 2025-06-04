@@ -29,21 +29,26 @@ def setup_node(node, config, dist_handler, os_handler, is_server=False, is_first
         if not os_handler.disable_swap(ssh, node):
             raise Exception("Failed to disable swap")
         
-        if not os_handler.configure_kernel_modules(ssh):
+        if not os_handler.configure_kernel_modules(ssh, node):
             raise Exception("Failed to configure kernel modules")
         
-        if not os_handler.configure_selinux(ssh):
+        if not os_handler.configure_selinux(ssh, node):
             raise Exception("Failed to configure SELinux/AppArmor")
         
-        if not os_handler.configure_firewall(ssh, 'server' if is_server else 'agent'):
+        if not os_handler.configure_firewall(ssh, 'server' if is_server else 'agent', node):
             raise Exception("Failed to configure firewall")
         
         # Step 2: Container runtime installation
         log_message("Step 2: Installing container runtime...")
         
-        runtime = config['deployment'].get('vanilla_k8s', {}).get('container_runtime', 'containerd')
-        if not os_handler.install_container_runtime(ssh, runtime):
-            raise Exception("Failed to install container runtime")
+        # Only install the container runtime using 'vanilla
+        deployment_type = config.get('deployment', {}).get('type')
+        if deployment_type == 'vanilla_k8s':
+            runtime = config['deployment']['vanilla_k8s'].get('container_runtime', 'containerd')
+            if not os_handler.install_container_runtime(ssh, runtime):
+                raise Exception("Failed to install container runtime")
+        else: 
+            log_warning(node, 'Skipping container runtime install...')
         
         # Step 3: Distribution-specific preparation
         log_message("Step 3: Preparing for Kubernetes distribution...")

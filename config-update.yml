@@ -2,6 +2,8 @@
 deployment:
   # Kubernetes distribution choice
   k8s_distribution: "rke2"  # Options: rke2, eks-anywhere, vanilla, k3s, kubeadm
+
+  debug: True
   
   # Operating system configuration
   os:

@@ -22,6 +22,7 @@ class BundleManager:
         
         # Use sudo to create directories since we're not root
         create_dirs_cmd = f"sudo mkdir -p {bundles_path} {images_path} && sudo chown {node['user']}:{node['user']} {bundles_path} {images_path}"
+        print(create_dirs_cmd)
         if not run_ssh_command(ssh_client, create_dirs_cmd):
             return False
         
@@ -43,10 +44,10 @@ class BundleManager:
         rke2_config = self.config['deployment']['rke2']
         
         bundles_to_upload = [
-            ('airgap_bundle_path', 'rke2-airgap-bundle.tar.gz'),
-            ('images_bundle_path', 'rke2-images.tar.gz'),
-            ('rpm_bundle_path', 'rke2-rpms.tar.gz'),
-            ('install_script_path', 'install.sh')
+            ('airgap_bundle_path', 'rke2-airgap-bundle.tar.gz')
+            # ('images_bundle_path', 'rke2-images.tar.gz'),
+            # ('rpm_bundle_path', 'rke2-rpms.tar.gz'),
+            # ('install_script_path', 'install.sh')
         ]
         
         for config_key, filename in bundles_to_upload:
@@ -83,6 +84,7 @@ class BundleManager:
     def _upload_file(self, ssh_client, local_path, remote_path):
         """Upload a file to the remote node"""
         try:
+            print(local_path)
             if not os.path.exists(local_path):
                 log_error(f"Local file not found: {local_path}")
                 return False

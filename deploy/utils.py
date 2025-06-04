@@ -121,12 +121,20 @@ def log_warning(
             details_color=colorama.Fore.YELLOW
         )
 
+
 def log_debug(
     node_or_message: Union[str, Dict[str, Any]], 
     message: str = None, 
     details: str = None
 ) -> None:
-    """Log a debug message (only shown if DEBUG env var is set)"""
+    """Log a debug message (only shown if DEBUG env var is set)
+    
+        Need to fix the debugging issue Log
+
+        Design options this should come from a config value not a 
+        OS environment variable
+    
+    """
     if not os.getenv('DEBUG', '').lower() in ('1', 'true', 'yes'):
         return
         
@@ -145,6 +153,8 @@ def log_debug(
             details=details, 
             details_color=colorama.Fore.CYAN
         )
+
+
 
 # SSH utility functions
 def run_ssh_command(

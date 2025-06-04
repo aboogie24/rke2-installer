@@ -9,15 +9,22 @@ class AirgappedRKE2Handler(BaseDistributionHandler):
     
     def __init__(self):
         self.bundle_manager = None
+
+    def generate_config_files(self, config, node_type, is_first_server=False):
+        """Generate RKE2 configuration files"""
+        if node_type == 'server':
+            return self.generate_server_config(config, is_first_server)
+        else:
+            return self.generate_agent_config(config)
     
     def validate_requirements(self, config):
         """Validate RKE2 airgapped requirements"""
         rke2_config = config['deployment'].get('rke2', {})
         
         required_bundles = [
-            'airgap_bundle_path',
-            'images_bundle_path',
-            'install_script_path'
+            'airgap_bundle_path'
+            # 'images_bundle_path',
+            # 'install_script_path'
         ]
         
         for bundle in required_bundles:
@@ -92,8 +99,9 @@ class AirgappedRKE2Handler(BaseDistributionHandler):
         bundles_path = staging_paths.get('bundles', '/tmp/k8s-bundles')
         
         # Load container images first
-        if not self._load_container_images(ssh_client, config, bundles_path):
-            return False
+        if config['deployment']['k8s_distribution'] != 'rke2':
+            if not self._load_container_images(ssh_client, config, bundles_path):
+                return False
         
         # Extract and install RKE2 from airgap bundle
         if not self._install_rke2_airgapped(ssh_client, config, bundles_path, node_type):
@@ -134,23 +142,34 @@ class AirgappedRKE2Handler(BaseDistributionHandler):
         
         # Extract airgap bundle
         airgap_bundle = f"{bundles_path}/rke2-airgap-bundle.tar.gz"
+        print(airgap_bundle)
         extract_cmd = f"cd /tmp && sudo tar -xzf {airgap_bundle}"
         
         if not run_ssh_command(ssh_client, extract_cmd):
             log_error("Failed to extract RKE2 airgap bundle")
             return False
         
-        # Make install script executable and run it
-        install_script = f"{bundles_path}/install.sh"
-        install_commands = [
-            f"chmod +x {install_script}",
-            f"sudo INSTALL_RKE2_TYPE='{node_type}' INSTALL_RKE2_METHOD='tar' sh {install_script}"
+        install_cmds = [
+            f"ls -la /tmp/rke2-airgap-bundle", 
+            
         ]
-        
-        for cmd in install_commands:
+
+        for cmd in install_cmds:
             if not run_ssh_command(ssh_client, cmd):
                 log_error(f"Failed to install RKE2: {cmd}")
                 return False
+        
+        # # Make install script executable and run it
+        # install_script = f"{bundles_path}/install.sh"
+        # install_commands = [
+        #     f"chmod +x {install_script}",
+        #     f"sudo INSTALL_RKE2_TYPE='{node_type}' INSTALL_RKE2_METHOD='tar' sh {install_script}"
+        # ]
+        
+        # for cmd in install_commands:
+        #     if not run_ssh_command(ssh_client, cmd):
+        #         log_error(f"Failed to install RKE2: {cmd}")
+        #         return False
         
         return True
     

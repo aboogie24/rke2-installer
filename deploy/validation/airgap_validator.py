@@ -18,9 +18,9 @@ class AirgapValidator:
         if dist == 'rke2':
             rke2_config = self.config['deployment']['rke2']
             required_bundles = [
-                'airgap_bundle_path',
-                'images_bundle_path',
-                'install_script_path'
+                'airgap_bundle_path'
+                # 'images_bundle_path',
+                # 'install_script_path'
             ]
             
             for bundle_key in required_bundles:
@@ -29,18 +29,19 @@ class AirgapValidator:
                     if not os.path.exists(bundle_path):
                         missing_bundles.append(bundle_path)
         
-        elif dist == 'k3s':
-            k3s_config = self.config['deployment']['k3s']
-            required_bundles = [
-                'binary_path',
-                'images_bundle_path'
-            ]
+        
+        # elif dist == 'k3s':
+        #     k3s_config = self.config['deployment']['k3s']
+        #     required_bundles = [
+        #         'binary_path',
+        #         'images_bundle_path'
+        #     ]
             
-            for bundle_key in required_bundles:
-                if bundle_key in k3s_config:
-                    bundle_path = k3s_config[bundle_key]
-                    if not os.path.exists(bundle_path):
-                        missing_bundles.append(bundle_path)
+        #     for bundle_key in required_bundles:
+        #         if bundle_key in k3s_config:
+        #             bundle_path = k3s_config[bundle_key]
+        #             if not os.path.exists(bundle_path):
+        #                 missing_bundles.append(bundle_path)
         
         # Check package bundles
         packages_config = self.config.get('packages', {})
