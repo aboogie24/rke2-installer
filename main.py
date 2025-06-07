@@ -100,6 +100,18 @@ def validate_config(config):
     elif k8s_dist == 'eks-anywhere' and 'eks_anywhere' not in deployment:
         raise click.ClickException("EKS Anywhere configuration section missing")
 
+def get_cluster_config(cfg):
+    """
+    Return the appropriate cluster config based on the Kubernetes distribution.
+    Example:
+    cfg['deployment']['k8s_distribution'] == 'rke2' --> cfg['cluster']['rke2']
+    """
+    k8s_dist = cfg.get('deployment', {}).get('k8s_distribution')
+    cluster_config = cfg.get('cluster', {}).get(k8s_dist)
+    if not cluster_config:
+        raise ValueError(f"Missing cluster configuration for distribution: {k8s_dist}")
+    return cluster_config
+
 @click.group()
 def cli():
     """Multi-Distribution Kubernetes Airgapped Deployment CLI"""
@@ -135,9 +147,15 @@ def deploy(config, extra_tools, dry_run, skip_validation, stage_only):
     k8s_dist = deployment.get('k8s_distribution', 'rke2')
     os_info = deployment.get('os', {'type': 'rhel', 'version': '8'})
     airgap_enabled = deployment.get('airgap', {}).get('enabled', True)
+
+    try: 
+        cluster_config = get_cluster_config(cfg)
+    except Exception as e:
+        log_error(str(e))
+        return
     
     click.echo(colorama.Fore.CYAN + f"Deploying {k8s_dist.upper()} cluster: " + 
-               colorama.Fore.YELLOW + f"{cfg['cluster']['name']}")
+               colorama.Fore.YELLOW + f"{cluster_config.get('name', 'Unnamed')}")
     click.echo(colorama.Fore.CYAN + f"Target OS: " + 
                colorama.Fore.YELLOW + f"{os_info['type']} {os_info['version']}")
     
@@ -238,7 +256,7 @@ def deploy(config, extra_tools, dry_run, skip_validation, stage_only):
         if not post_install_health_check(node, dist_handler):
             log_warning(f"Health check failed on {node['hostname']}")
 
-    log_success(f"✅ {k8s_dist.upper()} cluster '{cfg['cluster']['name']}' deployed successfully!")
+    log_success(f"✅ {k8s_dist.upper()} cluster '{cfg['cluster'][k8s_dist]['name']}' deployed successfully!")
     
     # Display kubeconfig info for airgapped environments
     if airgap_enabled and k8s_dist == 'rke2':
@@ -318,7 +336,7 @@ def show_deployment_plan(cfg):
     click.echo(f"\nDeployment Plan:")
     click.echo(f"  Kubernetes Distribution: {k8s_dist}")
     click.echo(f"  Default OS: {deployment['os']['type']} {deployment['os']['version']}")
-    click.echo(f"  Cluster Name: {cfg['cluster']['name']}")
+    click.echo(f"  Cluster Name: {cfg['cluster'][k8s_dist]['name']}")
     click.echo(f"  Airgapped: {'Yes' if airgap_enabled else 'No'}")
     
     if airgap_enabled:
@@ -380,7 +398,7 @@ def uninstall(config, force):
     total_nodes = len(cfg['nodes']['servers']) + len(cfg['nodes']['agents'])
     
     click.echo(colorama.Fore.RED + f"Preparing to uninstall {k8s_dist.upper()} from " + 
-              colorama.Fore.YELLOW + f"{cfg['cluster']['name']}" + 
+              colorama.Fore.YELLOW + f"{cfg['cluster'][k8s_dist]['name']}" + 
               colorama.Fore.RED + f" ({total_nodes} nodes)")
     
     if not force:
@@ -401,7 +419,7 @@ def uninstall(config, force):
     
     uninstall_cluster(cfg, dist_handler)
     
-    log_success(f"✅ {k8s_dist.upper()} uninstallation complete for cluster '{cfg['cluster']['name']}'")
+    log_success(f"✅ {k8s_dist.upper()} uninstallation complete for cluster '{cfg['cluster'][k8s_dist]['name']}'")
     display_space_jam_logo4()
 
 @cli.command()

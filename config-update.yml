@@ -48,51 +48,52 @@ deployment:
     images_bundle_path: "/opt/k8s-bundles/k3s-airgap-images-amd64.tar.gz"
 
 cluster:
-  name: my-airgapped-cluster
-  domain: internal.local
-  token: K1078d6efc5ece52ed16e86a6d19bddfb222e89862efc74b7f9187f203fbc06fa00::server:a3dab4acb8829dedba9b7fe99966c153
-  cluster_cidr: 10.42.0.0/16
-  service_cidr: 10.43.0.0/16
-  
-  # Registry configuration for airgapped environments
-  registry: 
-    mirrors:
-      "*":  # Redirect all registry requests to local registry
-        endpoints:
-          - "https://registry.internal.local:5000"
-      "docker.io":
-        endpoints:
-          - "https://registry.internal.local:5000/docker.io"
-      "quay.io":
-        endpoints:
-          - "https://registry.internal.local:5000/quay.io"
-      "gcr.io":
-        endpoints:
-          - "https://registry.internal.local:5000/gcr.io"
-      "k8s.gcr.io":
-        endpoints:
-          - "https://registry.internal.local:5000/k8s.gcr.io"
-      "registry.k8s.io":
-        endpoints:
-          - "https://registry.internal.local:5000/registry.k8s.io"
-    configs:
-      "registry.internal.local:5000":
-        tls:
-          insecure_skip_verify: true
-        auth:
-          username: "registry-user"
-          password: "registry-password"
-  
-  # CNI configuration
-  cni:
-    - multus
-    - canal
-  disable_network_policy: false
-  write_kubeconfig_mode: "0644"
-  
-  # Components to disable (useful in airgapped environments)
-  disable:
-    - rke2-ingress-nginx  # Often replaced with custom ingress
+  rke2:
+    name: my-airgapped-cluster
+    domain: internal.local
+    token: K1078d6efc5ece52ed16e86a6d19bddfb222e89862efc74b7f9187f203fbc06fa00::server:a3dab4acb8829dedba9b7fe99966c153
+    cluster_cidr: 10.42.0.0/16
+    service_cidr: 10.43.0.0/16
+    
+    # Registry configuration for airgapped environments
+    registry: 
+      mirrors:
+        "*":  # Redirect all registry requests to local registry
+          endpoints:
+            - "https://registry.internal.local:5000"
+        "docker.io":
+          endpoints:
+            - "https://registry.internal.local:5000/docker.io"
+        "quay.io":
+          endpoints:
+            - "https://registry.internal.local:5000/quay.io"
+        "gcr.io":
+          endpoints:
+            - "https://registry.internal.local:5000/gcr.io"
+        "k8s.gcr.io":
+          endpoints:
+            - "https://registry.internal.local:5000/k8s.gcr.io"
+        "registry.k8s.io":
+          endpoints:
+            - "https://registry.internal.local:5000/registry.k8s.io"
+      configs:
+        "registry.internal.local:5000":
+          tls:
+            insecure_skip_verify: true
+          auth:
+            username: "registry-user"
+            password: "registry-password"
+    
+    # CNI configuration
+    cni:
+      - multus
+      - canal
+    disable_network_policy: false
+    write_kubeconfig_mode: "0644"
+    
+    # Components to disable (useful in airgapped environments)
+    disable:
+      - rke2-ingress-nginx  # Often replaced with custom ingress
 
 nodes:
   servers:

@@ -149,9 +149,13 @@ class AirgappedRKE2Handler(BaseDistributionHandler):
             log_error("Failed to extract RKE2 airgap bundle")
             return False
         
+        # **Broken***
+        # Fix to install rpm packages airgapped with stig needs
+        #     echo <password> | sudo -S <command>
+
         install_cmds = [
             f"ls -la /tmp/rke2-airgap-bundle",
-            f"echo {config[]}"
+             
 
         ]
 
