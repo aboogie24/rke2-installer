@@ -62,7 +62,7 @@ def migrate_legacy_config(old_config):
     for node_list in [new_config['nodes'].get('servers', []), new_config['nodes'].get('agents', [])]:
         for node in node_list:
             if node.get('user') == 'root':
-                log_warning(node, f"Converting root user to k8s-admin for {node['hostname']} - please ensure this user has sudo access")
+                log_warning(f"Converting root user to k8s-admin for {node['hostname']} - please ensure this user has sudo access")
                 node['user'] = 'k8s-admin'
                 node['sudo_password'] = ''
     
@@ -126,8 +126,11 @@ def cli():
 @click.option('--dry-run', is_flag=True, help='Show what would be deployed without actually deploying')
 @click.option('--skip-validation', is_flag=True, help='Skip pre-deployment validation')
 @click.option('--stage-only', is_flag=True, help='Only stage bundles, do not deploy')
-def deploy(config, extra_tools, dry_run, skip_validation, stage_only):
+@click.option('--verbose', '-v', is_flag=True, help='Enable debug logging')
+def deploy(config, extra_tools, dry_run, skip_validation, stage_only, verbose):
     """Deploy Kubernetes Cluster in Airgapped Environment"""
+    if verbose:
+        os.environ['DEBUG'] = 'true'
     display_animated_logo()
     
     try:
@@ -286,8 +289,12 @@ def get_airgapped_os_handler(os_type):
         from deploy.os_handlers.airgapped_rhel_handler import AirgappedRHELHandler
         return AirgappedRHELHandler()
     elif os_type in ['ubuntu', 'debian']:
-        from deploy.os_handlers.airgapped_ubuntu_handler import AirgappedUbuntuHandler
-        return AirgappedUbuntuHandler()
+        try:
+            from deploy.os_handlers.airgapped_ubuntu_handler import AirgappedUbuntuHandler
+            return AirgappedUbuntuHandler()
+        except ImportError:
+            log_warning("AirgappedUbuntuHandler not found, falling back to regular handler")
+            return get_os_handler(os_type)
     else:
         # Fallback to regular handlers
         return get_os_handler(os_type)

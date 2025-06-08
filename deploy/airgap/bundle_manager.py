@@ -14,27 +14,30 @@ class BundleManager:
     def stage_bundles_to_node(self, ssh_client, node, node_type):
         """Stage all required bundles to a node"""
         log_message(node, f"Staging bundles to {node['hostname']}...")
+
+        # Get the bundle extraction path
+        k8s_distro = self.config['deployment']['k8s_distribution']
+        extract_path = self.config['deployment'][k8s_distro]['tar_extract_path']
         
         # Create staging directories on remote node
         staging_paths = node.get('staging_paths', {})
-        bundles_path = staging_paths.get('bundles', '/tmp/k8s-bundles')
-        images_path = staging_paths.get('images', '/tmp/k8s-images')
+        bundles_path = staging_paths.get('bundles', extract_path)
         
         # Use sudo to create directories since we're not root
-        create_dirs_cmd = f"sudo mkdir -p {bundles_path} {images_path} && sudo chown {node['user']}:{node['user']} {bundles_path} {images_path}"
-        print(create_dirs_cmd)
+        create_dirs_cmd = f"sudo mkdir -p {bundles_path} && sudo chown {node['user']}:{node['user']} {bundles_path}"
+        
         if not run_ssh_command(ssh_client, create_dirs_cmd):
             return False
         
         # Upload bundles based on distribution
-        dist = self.config['deployment']['k8s_distribution']
-        if dist == 'rke2':
+        
+        if k8s_distro == 'rke2':
             return self._stage_rke2_bundles(ssh_client, node, bundles_path)
-        elif dist == 'eks-anywhere':
+        elif k8s_distro == 'eks-anywhere':
             return self._stage_eks_bundles(ssh_client, node, bundles_path)
-        elif dist in ['vanilla', 'kubeadm']:
+        elif k8s_distro in ['vanilla', 'kubeadm']:
             return self._stage_vanilla_bundles(ssh_client, node, bundles_path)
-        elif dist == 'k3s':
+        elif k8s_distro == 'k3s':
             return self._stage_k3s_bundles(ssh_client, node, bundles_path)
         
         return True
@@ -51,6 +54,7 @@ class BundleManager:
         ]
         
         for config_key, filename in bundles_to_upload:
+            log_message(f"Processing bundle: {config_key} -> {filename}")
             if config_key in rke2_config:
                 local_path = rke2_config[config_key]
                 remote_path = f"{staging_path}/{filename}"
@@ -60,7 +64,8 @@ class BundleManager:
                     return False
         
         return True
-    
+    # This method is not used anywhere yet
+    # 
     def _stage_k3s_bundles(self, ssh_client, node, staging_path):
         """Stage K3s bundles"""
         k3s_config = self.config['deployment']['k3s']
