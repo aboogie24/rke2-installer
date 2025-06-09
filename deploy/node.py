@@ -76,7 +76,7 @@ def setup_node(node, config, dist_handler, os_handler, is_server=False, is_first
         # Step 6: Install extra tools (if specified and this is a server)
         if is_server and 'extra_tools' in config:
             log_message("Step 6: Installing extra tools...")
-            install_extra_tools(ssh, config['extra_tools'], os_handler)
+            install_extra_tools(ssh, config['extra_tools'], os_handler, config)
         
         ssh.close()
         log_success(f"✅ Node {node['hostname']} setup completed successfully")
@@ -117,59 +117,135 @@ def install_gpu_stack(node, config, os_handler):
             ssh.close()
         return False
 
-def install_extra_tools(ssh_client, tools, os_handler):
+def install_extra_tools(ssh_client, tools, os_handler, config=None):
     """Install extra tools like k9s, helm, flux"""
     log_message("Installing extra tools...")
+    
+    # Check if we're in an airgapped environment
+    is_airgapped = config and config.get('deployment', {}).get('airgap', {}).get('enabled', False)
     
     for tool in tools:
         try:
             if tool == 'k9s':
-                install_k9s(ssh_client, os_handler)
+                install_k9s(ssh_client, os_handler, config, is_airgapped)
             elif tool == 'helm':
-                install_helm(ssh_client, os_handler)
+                install_helm(ssh_client, os_handler, config, is_airgapped)
             elif tool == 'flux':
-                install_flux(ssh_client, os_handler)
+                install_flux(ssh_client, os_handler, config, is_airgapped)
             else:
                 log_warning(f"Unknown tool: {tool}")
                 
         except Exception as e:
             log_error(f"Failed to install {tool}: {str(e)}")
 
-def install_k9s(ssh_client, os_handler):
+def install_k9s(ssh_client, os_handler, config=None, is_airgapped=False):
     """Install k9s"""
     from .utils import run_ssh_command
     
-    commands = [
-        "curl -sL https://github.com/derailed/k9s/releases/latest/download/k9s_Linux_amd64.tar.gz | tar xzf - -C /tmp",
-        "install -m 755 /tmp/k9s /usr/local/bin/k9s",
-        "rm -f /tmp/k9s"
-    ]
+    if is_airgapped and config:
+        # Get bundle path from config
+        bundle_path = _get_bundle_path(ssh_client, config)
+        if bundle_path:
+            log_message("Installing k9s from airgap bundle...")
+            commands = [
+                f"sudo cp {bundle_path}/bin/k9s /usr/bin/k9s",
+                "sudo chmod +x /usr/bin/k9s"
+            ]
+        else:
+            raise Exception("Bundle path not found for airgapped k9s installation")
+    else:
+        # Online installation
+        log_message("Installing k9s from internet...")
+        commands = [
+            "curl -sL https://github.com/derailed/k9s/releases/latest/download/k9s_Linux_amd64.tar.gz | tar xzf - -C /tmp",
+            "sudo install -m 755 /tmp/k9s /usr/local/bin/k9s",
+            "rm -f /tmp/k9s"
+        ]
     
     for cmd in commands:
         if not run_ssh_command(ssh_client, cmd):
             raise Exception(f"Failed to execute: {cmd}")
 
-def install_helm(ssh_client, os_handler):
+def install_helm(ssh_client, os_handler, config=None, is_airgapped=False):
     """Install Helm"""
     from .utils import run_ssh_command
     
-    commands = [
-        "curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash"
-    ]
+    if is_airgapped and config:
+        # Get bundle path from config
+        bundle_path = _get_bundle_path(ssh_client, config)
+        if bundle_path:
+            log_message("Installing helm from airgap bundle...")
+            commands = [
+                f"sudo cp {bundle_path}/bin/helm /usr/bin/helm",
+                "sudo chmod +x /usr/bin/helm"
+            ]
+        else:
+            raise Exception("Bundle path not found for airgapped helm installation")
+    else:
+        # Online installation
+        log_message("Installing helm from internet...")
+        commands = [
+            "curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash"
+        ]
     
     for cmd in commands:
         if not run_ssh_command(ssh_client, cmd):
             raise Exception(f"Failed to execute: {cmd}")
 
-def install_flux(ssh_client, os_handler):
+def install_flux(ssh_client, os_handler, config=None, is_airgapped=False):
     """Install Flux CLI"""
     from .utils import run_ssh_command
     
-    commands = [
-        "curl -s https://fluxcd.io/install.sh | bash",
-        "install -m 755 ~/.local/bin/flux /usr/local/bin/flux || install -m 755 ./flux /usr/local/bin/flux"
-    ]
+    if is_airgapped and config:
+        # Get bundle path from config
+        bundle_path = _get_bundle_path(ssh_client, config)
+        if bundle_path:
+            log_message("Installing flux from airgap bundle...")
+            commands = [
+                f"sudo cp {bundle_path}/bin/flux /usr/bin/flux",
+                "sudo chmod +x /usr/bin/flux"
+            ]
+        else:
+            raise Exception("Bundle path not found for airgapped flux installation")
+    else:
+        # Online installation
+        log_message("Installing flux from internet...")
+        commands = [
+            "curl -s https://fluxcd.io/install.sh | bash",
+            "sudo install -m 755 ~/.local/bin/flux /usr/local/bin/flux || sudo install -m 755 ./flux /usr/local/bin/flux"
+        ]
     
     for cmd in commands:
         if not run_ssh_command(ssh_client, cmd):
             raise Exception(f"Failed to execute: {cmd}")
+
+def _get_bundle_path(ssh_client, config):
+    """Get the bundle path for airgapped installations"""
+    from .utils import run_ssh_command
+    
+    # Try to get the current node to find its staging paths
+    try:
+        transport = ssh_client.get_transport()
+        if not transport:
+            return None
+
+        remote_host = transport.getpeername()[0]
+
+        # Search in servers
+        for node in config.get('nodes', {}).get('servers', []):
+            if node.get('ip') == remote_host or node.get('hostname') == remote_host:
+                staging_paths = node.get('staging_paths', {})
+                return staging_paths.get('bundles', '/tmp/k8s-bundles')
+
+        # Search in agents
+        for node in config.get('nodes', {}).get('agents', []):
+            if node.get('ip') == remote_host or node.get('hostname') == remote_host:
+                staging_paths = node.get('staging_paths', {})
+                return staging_paths.get('bundles', '/tmp/k8s-bundles')
+
+        # Default fallback
+        return '/tmp/k8s-bundles'
+
+    except Exception as e:
+        log_error(f"Failed to get bundle path: {e}")
+        return '/tmp/k8s-bundles'

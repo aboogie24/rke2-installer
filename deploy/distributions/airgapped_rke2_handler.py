@@ -146,21 +146,26 @@ class AirgappedRKE2Handler(BaseDistributionHandler):
             log_warning("No images bundle path specified, skipping image loading")
             return True
             
-        # Check if images bundle exists in staging area
-        staged_images_bundle = f"{bundles_path}/rke2-images.linux-amd64.tar.gz"
+        # Check if images bundle exists in staging area - look for .tar.zst first, then .tar.gz
+        staged_images_bundle = f"{bundles_path}/images/rke2-images.linux-amd64.tar.zst"
+        
         if not run_ssh_command(ssh_client, f"test -f {staged_images_bundle}", return_output=True)[2] == 0:
-            log_warning(f"Images bundle not found at {staged_images_bundle}, checking original path")
-            if not run_ssh_command(ssh_client, f"test -f {images_bundle}", return_output=True)[2] == 0:
-                log_error(f"Images bundle not found at {images_bundle}")
-                return False
-            staged_images_bundle = images_bundle
+            # Try .tar.gz as fallback
+            staged_images_bundle = f"{bundles_path}/rke2-images.linux-amd64.tar.gz"
+            
+            if not run_ssh_command(ssh_client, f"test -f {staged_images_bundle}", return_output=True)[2] == 0:
+                log_warning(f"Images bundle not found at {staged_images_bundle}, checking original path")
+                if not run_ssh_command(ssh_client, f"test -f {images_bundle}", return_output=True)[2] == 0:
+                    log_error(f"Images bundle not found at {images_bundle}")
+                    return False
+                staged_images_bundle = images_bundle
         
-        # Extract images directly to RKE2 agent images directory
-        log_message("Extracting container images to RKE2 agent images directory...")
-        extract_cmd = f"sudo tar -xzf {staged_images_bundle} -C /var/lib/rancher/rke2/agent/images/"
+        # Copy images bundle to RKE2 agent images directory
+        log_message("Copying container images bundle to RKE2 agent images directory...")
+        copy_cmd = f"sudo cp {staged_images_bundle} /var/lib/rancher/rke2/agent/images/"
         
-        if not run_ssh_command(ssh_client, extract_cmd):
-            log_error("Failed to extract container images to RKE2 directory")
+        if not run_ssh_command(ssh_client, copy_cmd):
+            log_error("Failed to copy container images to RKE2 directory")
             return False
         
         # Set proper permissions
@@ -206,12 +211,32 @@ class AirgappedRKE2Handler(BaseDistributionHandler):
         for rpm_package in rpm_packages:
             rpm_path = f"{extract_path}/rpms/{rpm_package}"
             
+            # Extract package name for checking if already installed
+            package_name = rpm_package.split('-')[0] + '-' + rpm_package.split('-')[1]  # e.g., "rke2-selinux"
+            
+            # Check if package is already installed
+            check_cmd = f"rpm -q {package_name}"
+            stdout, stderr, exit_code = run_ssh_command(ssh_client, check_cmd, return_output=True)
+            
+            if exit_code == 0:
+                log_warning(f"Package {package_name} is already installed, skipping...")
+                continue
+            
             # Use the run_ssh_command function's built-in sudo support
             install_cmd = f"rpm -ivh {rpm_path}"
             
-            if not run_ssh_command(ssh_client, install_cmd, sudo=True, sudo_password=sudo_password):
-                log_error(f"Failed to install RPM package: {rpm_package}")
-                return False
+            # Get detailed output for error handling
+            stdout, stderr, exit_code = run_ssh_command(ssh_client, install_cmd, sudo=True, sudo_password=sudo_password, return_output=True)
+            
+            if exit_code != 0:
+                # Check if the error is due to package already being installed
+                if "is already installed" in stderr:
+                    log_warning(f"Package {rpm_package} is already installed, continuing...")
+                    continue
+                else:
+                    log_error(f"Failed to install RPM package: {rpm_package}")
+                    log_error(f"Error output: {stderr}")
+                    return False
             else:
                 log_success(f"Successfully installed: {rpm_package}")
         

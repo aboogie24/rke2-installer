@@ -128,4 +128,16 @@ nodes:
 
 **Configuration Change**: For pure airgapped deployments, registry configuration is now commented out to prevent external registry lookups.
 
-All critical logic errors have been resolved, and the code should now function correctly for RKE2 airgapped deployments with proper offline image loading.
+### 8. **RPM Package Already Installed Error**
+
+**Problem**: RPM installation was failing when packages were already installed, causing deployment to abort with "package is already installed" errors.
+
+**Fix**:
+- Added pre-installation check using `rpm -q` to detect already installed packages
+- Skip installation for packages that are already present
+- Added proper error handling to distinguish between "already installed" and actual installation failures
+- Continue deployment gracefully when packages are already present
+
+**Location**: `rke2-install/deploy/distributions/airgapped_rke2_handler.py` lines 190-220
+
+All critical logic errors have been resolved, and the code should now function correctly for RKE2 airgapped deployments with proper offline image loading and robust package management.
