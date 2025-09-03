@@ -111,6 +111,8 @@ def setup_node(node, cfg, is_server, is_first_server=False):
         log_message(node, f"Configuring systemd service for", details=f"{'server' if is_server else 'agent'}")
         configure_systemd(ssh, extract_path, is_server, server_ip, node)
 
+        join_token = None
+
         if is_server and is_first_server:
             # Wait for RKE2 to be fully operational
             log_message(node, "Waiting for RKE2 to be ready before deploying kubectl and other tools...")
@@ -120,6 +122,16 @@ def setup_node(node, cfg, is_server, is_first_server=False):
             exit_code = stdout.channel.recv_exit_status()
             
             if exit_code == 0:
+                log_message(node, "Retrieving join token for additional servers...")
+                stdin, stdout, stderr = ssh.exec_command("sudo cat /var/lib/rancher/rke2/server/node-token")
+                join_token = stdout.read().decode('utf-8').strip()
+                
+                if join_token:
+                    log_success(node, "Successfully retrieved join token")
+                    cfg['cluster']['join_token'] = join_token
+                else:
+                    log_error(node, "Failed to retrieve join token")
+                    
                 log_message(node, "RKE2 configuration detected, deploying kubectl...")
                 deploy_kubectl(ssh, node, extract_path)
                 if 'extra_tools' in cfg and cfg['extra_tools']:
@@ -131,6 +143,7 @@ def setup_node(node, cfg, is_server, is_first_server=False):
                         install_helm(ssh, node, extract_path)
                     if 'flux' in cfg['extra_tools']:
                         install_flux(ssh, node, extract_path)
+                return join_token
             else:
                 log_warning(node, "Timed out waiting for RKE2 configuration, skipping kubectl deployment")
             
