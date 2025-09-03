@@ -11,6 +11,9 @@ def write_server_config_yaml(ssh, node, is_first_server, cfg):
 
     if is_first_server: 
         config['cluster-init'] = True
+    else:
+        config['token'] = cfg['cluster']['join_token']
+        config['server'] = f"https://{
 
     # Dynamically generate tls-san from node info
     tls_san = [node['ip'], node['hostname']]
