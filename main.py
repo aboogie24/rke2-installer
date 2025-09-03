@@ -36,13 +36,24 @@ def deploy(config, extra_tools):
 
     click.echo(colorama.Fore.CYAN + f"Deploying RKE2 cluster: " + colorama.Fore.YELLOW + f"{cfg['cluster']['name']}\n")
 
-    # Server nodes
-    for i, node in enumerate(cfg['nodes']['servers']):
-        is_first_server = (i == 0)
+    servers = cfg['nodes']['servers']
+
+    if servers: 
+        first_server = servers[0]
         click.echo(colorama.Fore.CYAN + f"[" + colorama.Fore.YELLOW + f"{node['hostname']}" + colorama.Fore.CYAN + 
                    f"] Setting up {'first' if is_first_server else 'joining'} server " + 
                    colorama.Fore.MAGENTA + f"({node['ip']})")
-        setup_node(node, cfg, is_server=True, is_first_server=is_first_server)
+
+        join_token = setup_node(node, cfg, is_server=True, is_first_server=True)
+        # Server nodes
+        for i, node in enumerate(servers[1:], 1):
+            click.echo(colorama.Fore.CYAN + f"[" + colorama.Fore.YELLOW + f"{node['hostname']}" + colorama.Fore.CYAN + 
+                       f"] Setting up {'first' if is_first_server else 'joining'} server " + 
+                       colorama.Fore.MAGENTA + f"({node['ip']})")
+            if join_token: 
+                cfg['cluster']['join_token'] = join_token
+                
+            setup_node(node, cfg, is_server=True, is_first_server=is_first_server)
 
     # Agent nodes
     for node in cfg['nodes']['agents']:
