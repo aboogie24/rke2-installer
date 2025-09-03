@@ -3,7 +3,7 @@ import colorama
 import click
 from .utils import log_message, log_error, log_success
 
-def write_server_config_yaml(ssh, node, is_first_server, cfg):
+def write_server_config_yaml(ssh, node, is_first_server, cfg, first_server_ip=None):
     config = {
         "token": cfg['cluster']['token'],
         "node-name": node['hostname']
@@ -13,7 +13,7 @@ def write_server_config_yaml(ssh, node, is_first_server, cfg):
         config['cluster-init'] = True
     else:
         config['token'] = cfg['cluster']['join_token']
-        config['server'] = f"https://{
+        config['server'] = f"https://{first_server_ip}:9345"
 
     # Dynamically generate tls-san from node info
     tls_san = [node['ip'], node['hostname']]
