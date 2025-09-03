@@ -105,7 +105,7 @@ def setup_node(node, cfg, is_server, is_first_server=False):
 
         if is_server:
             log_message(node, "Writing RKE2 config.yaml...")
-            write_server_config_yaml(ssh, node, is_first_server, cfg)
+            write_server_config_yaml(ssh, node, is_first_server, cfg, server_ip)
 
         # After RPM install
         log_message(node, f"Configuring systemd service for", details=f"{'server' if is_server else 'agent'}")
