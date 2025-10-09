@@ -26,6 +26,7 @@ class AirgapValidator:
             for bundle_key in required_bundles:
                 if bundle_key in rke2_config:
                     bundle_path = rke2_config[bundle_key]
+                    log_message(f"Checking for bundle: {bundle_path}")
                     if not os.path.exists(bundle_path):
                         missing_bundles.append(bundle_path)
         
@@ -140,9 +141,9 @@ class AirgapValidator:
         
         # Validate registry
         validation_results.append(self.validate_registry_access())
-
-        # Validate tmp
-        validation_results.append(self.validate_tmp_directory())
+        
+        # Note: validate_tmp_directory() is called during actual deployment
+        # when ssh_client and os_handler are available
         
         # Validate SSH access to all nodes
         for node in self.config['nodes']['servers'] + self.config['nodes']['agents']:
