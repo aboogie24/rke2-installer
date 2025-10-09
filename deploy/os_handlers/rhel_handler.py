@@ -270,3 +270,12 @@ net.ipv4.ip_forward = 1
     def get_package_manager(self):
         """Return the package manager for RHEL"""
         return "dnf"
+
+    def config_tmp_directory(self, ssh_client):
+        """Configure /tmp directory if needed"""
+        log_message("Configuring /tmp directory...")
+        # Example: Ensure /tmp has the correct permissions
+        if not run_ssh_command(ssh_client, "chmod 1777 /tmp"):
+            log_error("Failed to set permissions on /tmp")
+            return False
+        return True

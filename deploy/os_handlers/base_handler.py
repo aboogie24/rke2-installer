@@ -48,6 +48,11 @@ class BaseOSHandler(ABC):
         """Return the package manager command for this OS"""
         pass
     
+    @abstractmethod
+    def config_tmp_directory(self, ssh_client):
+        """Configure /tmp directory if needed"""
+        pass
+    
     def get_os_name(self):
         """Return the OS name"""
         return self.__class__.__name__.replace('Handler', '').lower()

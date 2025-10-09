@@ -114,6 +114,17 @@ class AirgapValidator:
         
         log_success(f"✅ SSH configuration valid for {node['hostname']}")
         return True
+
+    def validate_tmp_directory(self, ssh_client, os_handler):
+        """Validate /tmp directory configuration on the node"""
+        log_message("Validating /tmp directory configuration...")
+        
+        if not os_handler.config_tmp_directory(ssh_client):
+            log_error("Failed to configure /tmp directory")
+            return False
+        
+        log_success("✅ /tmp directory configured correctly")
+        return True
     
     def run_full_validation(self):
         """Run complete validation for airgapped deployment"""
@@ -129,6 +140,9 @@ class AirgapValidator:
         
         # Validate registry
         validation_results.append(self.validate_registry_access())
+
+        # Validate tmp
+        validation_results.append(self.validate_tmp_directory())
         
         # Validate SSH access to all nodes
         for node in self.config['nodes']['servers'] + self.config['nodes']['agents']:
