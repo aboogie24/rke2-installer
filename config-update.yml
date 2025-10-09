@@ -57,6 +57,9 @@ cluster:
     
     # Registry configuration for airgapped environments
     registry: 
+      # CA certificate for private registry - will be deployed to containerd certs.d directory
+      ca_cert_path: /opt/certs/registry/ca.crt  # Path to CA certificate on local machine
+      registry_host: registry.internal.local:5000  # Registry hostname for cert deployment
       mirrors:
         "*":  # Redirect all registry requests to local registry
           endpoints:

@@ -63,6 +63,11 @@ class BundleManager:
                     log_error(node, f"Failed to upload {filename}")
                     return False
         
+        # Stage registry CA certificate if configured
+        if not self._stage_registry_ca_cert(ssh_client, node, staging_path):
+            log_error(node, "Failed to stage registry CA certificate")
+            return False
+        
         return True
     # This method is not used anywhere yet
     # 
@@ -86,6 +91,40 @@ class BundleManager:
         
         return True
     
+    def _stage_registry_ca_cert(self, ssh_client, node, staging_path):
+        """Stage registry CA certificate to node"""
+        try:
+            # Check if registry configuration exists
+            k8s_distro = self.config['deployment']['k8s_distribution']
+            cluster_config = self.config.get('cluster', {}).get(k8s_distro, {})
+            registry_config = cluster_config.get('registry', {})
+            
+            # Check if ca_cert_path is configured
+            ca_cert_path = registry_config.get('ca_cert_path')
+            if not ca_cert_path:
+                log_message("No registry CA certificate configured, skipping...")
+                return True
+            
+            # Validate local CA cert file exists
+            if not os.path.exists(ca_cert_path):
+                log_error(node, f"Registry CA certificate not found: {ca_cert_path}")
+                return False
+            
+            # Upload CA cert to staging path
+            remote_ca_path = f"{staging_path}/ca.crt"
+            log_message(node, f"Staging registry CA certificate from {ca_cert_path}...")
+            
+            if not self._upload_file(ssh_client, ca_cert_path, remote_ca_path):
+                log_error(node, "Failed to upload registry CA certificate")
+                return False
+            
+            log_success(node, "Registry CA certificate staged successfully")
+            return True
+            
+        except Exception as e:
+            log_error(node, f"Failed to stage registry CA certificate: {e}")
+            return False
+    
     def _upload_file(self, ssh_client, local_path, remote_path):
         """Upload a file to the remote node"""
         try:
@@ -108,4 +147,3 @@ class BundleManager:
         except Exception as e:
             log_error(f"Failed to upload {local_path}: {e}")
             return False
-

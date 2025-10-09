@@ -64,7 +64,7 @@ def setup_node(node, config, dist_handler, os_handler, is_server=False, is_first
         log_message("Step 4: Installing Kubernetes distribution...")
         
         node_type = 'server' if is_server else 'agent'
-        if not dist_handler.install_distribution(ssh, config, node_type):
+        if not dist_handler.install_distribution(ssh, config, node_type, os_handler):
             raise Exception("Failed to install Kubernetes distribution")
         
         # Step 5: Start services

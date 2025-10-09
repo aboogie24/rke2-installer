@@ -278,3 +278,35 @@ net.ipv4.ip_forward = 1
             log_error("Failed to set permissions on /tmp")
             return False
         return True
+    
+    def deploy_registry_ca_cert(self, ssh_client, staging_path, registry_host):
+        """Deploy registry CA certificate to containerd certs.d directory"""
+        log_message(f"Deploying registry CA certificate for {registry_host}...")
+        
+        try:
+            # Source CA cert from staging path
+            source_ca_cert = f"{staging_path}/ca.crt"
+            
+            # Target path in containerd certs.d directory
+            target_dir = f"/var/lib/rancher/rke2/agent/etc/containerd/certs.d/{registry_host}"
+            target_ca_cert = f"{target_dir}/ca.crt"
+            
+            # Create the target directory structure with proper permissions
+            commands = [
+                f"sudo mkdir -p {target_dir}",
+                f"sudo cp {source_ca_cert} {target_ca_cert}",
+                f"sudo chmod 644 {target_ca_cert}",
+                f"sudo chown root:root {target_ca_cert}"
+            ]
+            
+            for cmd in commands:
+                if not run_ssh_command(ssh_client, cmd):
+                    log_error(f"Failed to execute: {cmd}")
+                    return False
+            
+            log_success(f"Registry CA certificate deployed to {target_ca_cert}")
+            return True
+            
+        except Exception as e:
+            log_error(f"Failed to deploy registry CA certificate: {e}")
+            return False

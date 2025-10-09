@@ -112,7 +112,7 @@ class RKE2Handler(BaseDistributionHandler):
         
         return '\n'.join(config_lines)
     
-    def install_distribution(self, ssh_client, config, node_type):
+    def install_distribution(self, ssh_client, config, node_type, os_handler=None):
         """Install RKE2"""
         log_message(f"Installing RKE2 {node_type}...")
         
@@ -126,6 +126,21 @@ class RKE2Handler(BaseDistributionHandler):
         install_script = f"INSTALL_RKE2_TYPE='{node_type}' sh /opt/rke2/install.sh"
         if not run_ssh_command(ssh_client, install_script):
             return False
+        
+        # Deploy registry CA certificate if configured and os_handler is provided
+        if os_handler and hasattr(os_handler, 'deploy_registry_ca_cert'):
+            k8s_distro = config['deployment']['k8s_distribution']
+            cluster_config = config.get('cluster', {}).get(k8s_distro, {})
+            registry_config = cluster_config.get('registry', {})
+            
+            if registry_config.get('ca_cert_path'):
+                registry_host = registry_config.get('registry_host', 'registry.internal.local:5000')
+                staging_path = config['deployment']['rke2'].get('tar_extract_path', '/opt/rke2')
+                
+                log_message("Deploying registry CA certificate...")
+                if not os_handler.deploy_registry_ca_cert(ssh_client, staging_path, registry_host):
+                    log_error("Failed to deploy registry CA certificate")
+                    return False
         
         return True
     
