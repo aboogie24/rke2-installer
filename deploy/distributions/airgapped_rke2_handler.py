@@ -451,7 +451,7 @@ class AirgappedRKE2Handler(BaseDistributionHandler):
         
         return True
     
-    def uninstall(self, ssh_client, node_type):
+    def uninstall(self, ssh_client, node_type, sudo_password=None):
         """Uninstall RKE2 in airgapped environment"""
         log_message(f"Uninstalling RKE2 {node_type}...")
         
@@ -466,6 +466,6 @@ class AirgappedRKE2Handler(BaseDistributionHandler):
         ]
         
         for cmd in commands:
-            run_ssh_command(ssh_client, cmd)  # Don't fail on errors during cleanup
+            run_ssh_command(ssh_client, cmd, return_output=True, timeout=300, sudo=True, sudo_password=sudo_password )  # Don't fail on errors during cleanup
         
         return True

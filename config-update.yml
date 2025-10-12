@@ -102,8 +102,8 @@ nodes:
   servers:
     - hostname: k8s-server-1
       ip: 10.0.4.10
-      user: k8s-admin  # Non-root user with sudo privileges
-      ssh_key: .ssh/cluster_key
+      user: aboogie  # Non-root user with sudo privileges
+      ssh_key: .ssh/rke2_cluster_key_new
       sudo_password: ""  # Empty if passwordless sudo, or use vault/env var
       # Staging paths on this specific node
       staging_paths:
@@ -113,8 +113,8 @@ nodes:
   agents:
     - hostname: k8s-agent-1
       ip: 10.0.4.177
-      user: k8s-admin
-      ssh_key: .ssh/cluster_key
+      user: aboogie
+      ssh_key: .ssh/rke2_cluster_key_new
       sudo_password: ""
       gpu_enabled: false
       staging_paths:

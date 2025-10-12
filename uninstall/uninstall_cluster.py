@@ -1,9 +1,11 @@
 from deploy.utils import log_message, log_error, log_success
 from deploy.os_handlers import get_os_handler
+from common.connect.node import connect_node
 import paramiko
 
 def uninstall_cluster(config, dist_handler):
     """Uninstall cluster using the appropriate distribution handler"""
+    log_message(f"Distribution: {dist_handler.get_distribution_name()}")
     
     # Uninstall from agent nodes first
     for node in config['nodes']['agents']:
@@ -15,21 +17,21 @@ def uninstall_cluster(config, dist_handler):
         log_message(f"Uninstalling from server: {node['hostname']}")
         uninstall_from_node(node, config, dist_handler, is_server=True)
 
+
+
+
 def uninstall_from_node(node, config, dist_handler, is_server=False):
     """Uninstall from a specific node"""
     try:
-        ssh = paramiko.SSHClient()
-        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        ssh.connect(
-            hostname=node["ip"],
-            username=node["user"],
-            key_filename=node["ssh_key"]
-        )
+        ssh = connect_node(node)
+        if ssh is None:
+            log_error(f"Skipping uninstallation for {node['hostname']} due to connection failure.")
+            return
         
         node_type = 'server' if is_server else 'agent'
         
         # Use distribution handler to uninstall
-        if not dist_handler.uninstall(ssh, node_type):
+        if not dist_handler.uninstall(ssh, node_type, sudo_password=node.get('sudo_password', '')):
             log_error(f"Failed to uninstall from {node['hostname']}")
         
         ssh.close()
