@@ -21,7 +21,7 @@ deployment:
   # Distribution-specific configurations for airgapped setup
   rke2:
     version: v1.32.3
-    airgap_bundle_path: /opt/k8s-bundles/rke2-airgap-bundle.tar.gz
+    airgap_bundle_path: /opt/k8s-new-bundle.tar.gz
     images_bundle_path: /opt/k8s-bundles/rke2-images.linux-amd64.tar.gz
     rpm_bundle_path: /opt/k8s-bundles/rke2-rpms.tar.gz
     binary_bundle_path: /opt/k8s-bundles/rke2.linux-amd64.tar.gz
@@ -107,7 +107,7 @@ nodes:
       sudo_password: ""  # Empty if passwordless sudo, or use vault/env var
       # Staging paths on this specific node
       staging_paths:
-        bundles: "/home/k8s-admin/staging/bundles"
+        bundles: "/tmp/"
         images: "/home/k8s-admin/staging/images"
 
   agents:
@@ -128,7 +128,7 @@ nodes:
 packages:
   rhel:
     # Staged package bundles (RPMs packaged for offline installation)
-    bundle_path: "/opt/k8s-bundles/rhel8-packages.tar.gz"
+    bundle_path: "/opt/new-k8s-bundle"
     base_packages:
       - container-selinux
       - iptables

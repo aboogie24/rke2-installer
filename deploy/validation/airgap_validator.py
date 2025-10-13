@@ -23,6 +23,7 @@ class AirgapValidator:
                 # 'install_script_path'
             ]
             
+            log_message(f"{required_bundles}")
             for bundle_key in required_bundles:
                 if bundle_key in rke2_config:
                     bundle_path = rke2_config[bundle_key]
@@ -47,10 +48,11 @@ class AirgapValidator:
         # Check package bundles
         packages_config = self.config.get('packages', {})
         for os_type, os_config in packages_config.items():
-            if 'bundle_path' in os_config:
-                bundle_path = os_config['bundle_path']
-                if not os.path.exists(bundle_path):
-                    missing_bundles.append(bundle_path)
+            if self.config['deployment']['os']['type'] == os_type: 
+                if 'bundle_path' in os_config:
+                    bundle_path = os_config['bundle_path']
+                    if not os.path.exists(bundle_path):
+                        missing_bundles.append(bundle_path)
         
         if missing_bundles:
             log_error("Missing required bundles:")

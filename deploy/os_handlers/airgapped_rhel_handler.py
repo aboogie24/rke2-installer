@@ -16,10 +16,53 @@ Possible solution: 'echo <Non root Pass> | sudo -S <command>'
 
 class AirgappedRHELHandler(BaseOSHandler):
     """Handler for RHEL in airgapped environments with non-root user"""
+
+    def stage_bundle(self, ssh_client, node, os_type, dist, local_bundle_path):
+        """
+            Stage bundle on host node
+        """
+        try:
+            log_message(node, "Openning SFTP connection....")
+            sftp = ssh_client.open_sftp()
+
+            file_size = os.path.getsize(local_bundle_path)
+            log_message(node, "Uploading",  details=f"{file_size/1024/1024:.2f} MB")
+
+            def progress_callback(transferred, total):
+                try:
+                    if total == 0: 
+                        return
+                    percentage = (transferred / total) * 100
+                    if abs(percentage % 10) < 0.5:
+                        mb = transferred / 1024 / 1024 
+                        log_message(node, "Transfer progress:", details=f"{percentage:.1f}% ({mb:.2f} MB)")
+                except Exception as e: 
+                    log_message(node, f"Progress callback error {e}")
+
+            remote_path = os.path.join(
+                node['staging_paths']['bundles'],
+                os.path.basename(local_bundle_path)
+            )
+
+            # Perform Transfer
+            sftp.put(
+                local_bundle_path,
+                remote_path,
+                callback=progress_callback if file_size > 10*1024*1024 else None
+            )             
+
+            return True
+        except Exception as e:
+            log_error(node, f"Failed stage bundle: {e}")
+                    # Upload with progress callback for large files
+
     
     def install_base_packages(self, ssh_client, node, packages=None):
         """Install base packages from local bundle"""
         log_message(node, "Installing base packages for RHEL (airgapped)...")
+        log_message(node, f"{packages}")
+
+        return
         
         # Check if we have a package bundle to work with
         bundle_path = "/tmp/k8s-bundles/rhel8-packages.tar.gz"
@@ -168,12 +211,12 @@ class AirgappedRHELHandler(BaseOSHandler):
         log_message(node, "Disabling swap...")
         
         commands = [
-            "sudo swapoff -a",
-            "sudo sed -i '/ swap / s/^\(.*\)$/#\1/g' /etc/fstab"
+            "swapoff -a",
+            "sed -i '/ swap / s/^\(.*\)$/#\1/g' /etc/fstab"
         ]
         
         for cmd in commands:
-            if not run_ssh_command(ssh_client, cmd):
+            if not run_ssh_command(ssh_client, cmd, return_output=False, timeout=300, sudo=True):
                 log_error(f"Failed to disable swap: {cmd}")
                 return False
         
@@ -228,3 +271,9 @@ net.ipv4.ip_forward = 1"""
         stdout, stderr, exit_code = run_ssh_command(ssh_client, 
             f"test -f {file_path} && echo 'exists'", return_output=True)
         return exit_code == 0 and 'exists' in stdout
+    
+    def config_tmp_directory(self, ssh_client): 
+        """
+        Configure tmp directory
+        """
+        return

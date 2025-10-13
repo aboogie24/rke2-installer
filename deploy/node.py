@@ -1,27 +1,72 @@
 import paramiko
+import os
 from .utils import log_message, log_error, log_success, log_warning
+from common.connect.node import connect_node
 
 def setup_node(node, config, dist_handler, os_handler, is_server=False, is_first_server=False):
     """Setup a node with the specified distribution and OS handlers"""
     
     try:
         # Establish SSH connection
-        ssh = paramiko.SSHClient()
-        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        
-        log_message(f"Connecting to {node['hostname']} ({node['ip']})...")
-        ssh.connect(
-            hostname=node["ip"],
-            username=node["user"],
-            key_filename=node["ssh_key"],
-            timeout=30
-        )
+        ssh = connect_node(node)
+        if ssh is None:
+            raise Exception("SSH connection failed")
         
         # Step 1: OS-level preparation
         log_message(node, "Step 1: Preparing operating system...")
         
+
+        # Get Os type
+        os_type = config['deployment']['os']['type']
+
+        dist = config['deployment']['k8s_distribution']
+
+        local_bundle_path = config['deployment'][dist]['airgap_bundle_path']
+
+        
+
         # Get packages from config if specified
-        packages = config.get('packages', {}).get(os_handler.get_os_name(), {}).get('base_packages')
+        packages = config.get('packages', {}).get(os_type, {}).get('base_packages')
+
+        log_message(node, "here")
+        if not os_handler.stage_bundle(ssh, node, os_type, dist, local_bundle_path):
+            raise Exception("Failed to stage bundle")
+
+        # # Transport Bundle to location
+        # log_message(node, "Openning SFTP connection....")
+        # sftp = ssh.open_sftp()
+
+        # # Get File size for progress tracking
+        # file_size = os.path.getsize(config['deployment'][dist]['airgap_bundle_path'])
+        # log_message(node, "Uploading",  details=f"{file_size/1024/1024:.2f} MB")
+
+        # # Upload with progress callback for large files
+        # def progress_callback(transferred, total):
+        #     try:
+        #         if total == 0: 
+        #             return
+        #         percentage = (transferred / total) * 100
+        #         if abs(percentage % 10) < 0.5:
+        #             mb = transferred / 1024 / 1024 
+        #             log_message(node, "Transfer progress:", details=f"{percentage:.1f}% ({mb:.2f} MB)")
+        #     except Exception as e: 
+        #         log_message(node, f"Progress callback error {e}")
+
+        # try: 
+        #     remote_path = os.path.join(
+        #         node['staging_paths']['bundles'],
+        #         os.path.basename(config['deployment'][dist]['airgap_bundle_path'])
+        #     )
+
+        #     # Perform Transfer
+        #     sftp.put(
+        #         config['deployment'][dist]['airgap_bundle_path'],
+        #         remote_path,
+        #         callback=progress_callback if file_size > 10*1024*1024 else None
+        #     )
+
+        # except Exception as e: 
+        #     log_error(node, f"Failed stage bundle: {e}")
         
         if not os_handler.install_base_packages(ssh, node, packages):
             raise Exception("Failed to install base packages")

@@ -2,6 +2,11 @@ from abc import ABC, abstractmethod
 
 class BaseOSHandler(ABC):
     """Base class for all operating system handlers"""
+
+    @abstractmethod
+    def stage_bundle(self, ssh_client, node, os_type, dist, local_bundle_path):
+        """Stage Bundle on host node"""
+        pass
     
     @abstractmethod
     def install_base_packages(self, ssh_client, packages=None):

@@ -42,7 +42,7 @@ def connect_node(node):
     try:
         ssh = paramiko.SSHClient()
         ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        paramiko.util.log_to_file("paramiko_debug.log")
+        # paramiko.util.log_to_file("paramiko_debug.log")
         ssh.connect(
             hostname=node['ip'],
             username=node['user'],
