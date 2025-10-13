@@ -46,10 +46,8 @@ def connect_node(node):
         ssh.connect(
             hostname=node['ip'],
             username=node['user'],
-            pkey=pkey,
-            # key_filename=node['ssh_key'],
-            look_for_keys=False,
-            allow_agent=False
+            pkey=pkey
+            # key_filename=node['ssh_key']
         )
         log_message(f"Connected to {node['hostname']}")
         return ssh
