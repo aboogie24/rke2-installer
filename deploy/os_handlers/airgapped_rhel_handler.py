@@ -56,16 +56,40 @@ class AirgappedRHELHandler(BaseOSHandler):
             log_error(node, f"Failed stage bundle: {e}")
                     # Upload with progress callback for large files
 
+    def extract_bundle(self, ssh_client, node, local_bundle_path): 
+        """Extract Bundle path"""
+        try: 
+            remote_path = os.path.join(
+                node['staging_paths']['bundles'],
+                os.path.basename(local_bundle_path)
+            )
+
+            extract_commands = [
+                f"tar -xvzf {remote_path}"
+            ]
+
+            for cmd in extract_commands:
+            if not run_ssh_command(ssh_client, cmd, return_output=False, timeout=300, sudo=True):
+                log_error(f"Failed to install packages: {cmd}")
+                return False
+            
+            return True
+        except Exception as e: 
+            log_error(node, f"Extraction Error: {e}")
+            return False
     
-    def install_base_packages(self, ssh_client, node, packages=None):
+    def install_base_packages(self, ssh_client, node, packages=None, local_bundle_path=None):
         """Install base packages from local bundle"""
         log_message(node, "Installing base packages for RHEL (airgapped)...")
         log_message(node, f"{packages}")
 
-        return
         
         # Check if we have a package bundle to work with
-        bundle_path = "/tmp/k8s-bundles/rhel8-packages.tar.gz"
+        remote_path = os.path.join(
+            node['staging_paths']['bundles'],
+            os.path.basename(local_bundle_path)
+        )
+
         if not self._check_remote_file_exists(ssh_client, bundle_path):
             log_warning("No package bundle found, assuming packages are pre-installed")
             return True

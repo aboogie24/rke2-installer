@@ -7,9 +7,14 @@ class BaseOSHandler(ABC):
     def stage_bundle(self, ssh_client, node, os_type, dist, local_bundle_path):
         """Stage Bundle on host node"""
         pass
+
+    @abstractmethod
+    def extract_bundle(self, ssh_client, node, local_bundle_path):
+        """Extract Bundle on host node"""
+        pass
     
     @abstractmethod
-    def install_base_packages(self, ssh_client, packages=None):
+    def install_base_packages(self, ssh_client, packages=None, local_bundle_path=None):
         """Install base packages required for Kubernetes"""
         pass
     

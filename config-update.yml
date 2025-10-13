@@ -128,7 +128,7 @@ nodes:
 packages:
   rhel:
     # Staged package bundles (RPMs packaged for offline installation)
-    bundle_path: "/opt/new-k8s-bundle"
+    bundle_path: "/tmp/k8s-new-bundle.tar.gz"
     base_packages:
       - container-selinux
       - iptables

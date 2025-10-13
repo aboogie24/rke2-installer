@@ -28,47 +28,13 @@ def setup_node(node, config, dist_handler, os_handler, is_server=False, is_first
         # Get packages from config if specified
         packages = config.get('packages', {}).get(os_type, {}).get('base_packages')
 
-        log_message(node, "here")
         if not os_handler.stage_bundle(ssh, node, os_type, dist, local_bundle_path):
             raise Exception("Failed to stage bundle")
-
-        # # Transport Bundle to location
-        # log_message(node, "Openning SFTP connection....")
-        # sftp = ssh.open_sftp()
-
-        # # Get File size for progress tracking
-        # file_size = os.path.getsize(config['deployment'][dist]['airgap_bundle_path'])
-        # log_message(node, "Uploading",  details=f"{file_size/1024/1024:.2f} MB")
-
-        # # Upload with progress callback for large files
-        # def progress_callback(transferred, total):
-        #     try:
-        #         if total == 0: 
-        #             return
-        #         percentage = (transferred / total) * 100
-        #         if abs(percentage % 10) < 0.5:
-        #             mb = transferred / 1024 / 1024 
-        #             log_message(node, "Transfer progress:", details=f"{percentage:.1f}% ({mb:.2f} MB)")
-        #     except Exception as e: 
-        #         log_message(node, f"Progress callback error {e}")
-
-        # try: 
-        #     remote_path = os.path.join(
-        #         node['staging_paths']['bundles'],
-        #         os.path.basename(config['deployment'][dist]['airgap_bundle_path'])
-        #     )
-
-        #     # Perform Transfer
-        #     sftp.put(
-        #         config['deployment'][dist]['airgap_bundle_path'],
-        #         remote_path,
-        #         callback=progress_callback if file_size > 10*1024*1024 else None
-        #     )
-
-        # except Exception as e: 
-        #     log_error(node, f"Failed stage bundle: {e}")
         
-        if not os_handler.install_base_packages(ssh, node, packages):
+        if not os_handler.extract_bundle(ssh, node, local_bundle_path):
+            raise Exception("Failed to extract bundle")
+ 
+        if not os_handler.install_base_packages(ssh, node, packages, local_bundle_path):
             raise Exception("Failed to install base packages")
         
         if not os_handler.disable_swap(ssh, node):
