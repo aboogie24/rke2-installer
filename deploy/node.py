@@ -23,6 +23,8 @@ def setup_node(node, config, dist_handler, os_handler, is_server=False, is_first
 
         local_bundle_path = config['deployment'][dist]['airgap_bundle_path']
 
+        log_message(node, f"{dist_handler.get_distribution_name()}")
+
         
 
         # Get packages from config if specified
@@ -62,10 +64,11 @@ def setup_node(node, config, dist_handler, os_handler, is_server=False, is_first
             log_warning(node, 'Skipping container runtime install...')
         
         # Step 3: Distribution-specific preparation
-        log_message("Step 3: Preparing for Kubernetes distribution...")
+        log_message(node, "Step 3: Preparing for Kubernetes distribution...")
         
         if is_server:
-            if not dist_handler.prepare_server_node(ssh, config, is_first_server):
+            log_message(node, f"distribution handler: {dist_handler.get_distribution_name()}")
+            if not dist_handler.prepare_server_node(ssh, config, node, is_first_server):
                 raise Exception("Failed to prepare server node")
         else:
             if not dist_handler.prepare_agent_node(ssh, config):
@@ -75,7 +78,7 @@ def setup_node(node, config, dist_handler, os_handler, is_server=False, is_first
         log_message("Step 4: Installing Kubernetes distribution...")
         
         node_type = 'server' if is_server else 'agent'
-        if not dist_handler.install_distribution(ssh, config, node_type, os_handler):
+        if not dist_handler.install_distribution(ssh, config, node_type):
             raise Exception("Failed to install Kubernetes distribution")
         
         # Step 5: Start services

@@ -9,7 +9,7 @@ class BaseDistributionHandler(ABC):
         pass
     
     @abstractmethod
-    def prepare_server_node(self, ssh_client, config, is_first_server=False):
+    def prepare_server_node(self, ssh_client, config, node, is_first_server=False):
         """Prepare and configure server node"""
         pass
     

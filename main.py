@@ -8,7 +8,7 @@ from deploy import config_generator
 from deploy.node import setup_node, install_gpu_stack
 from deploy.health import post_install_health_check
 from deploy.utils import log_message, log_error, log_success, log_warning
-from deploy.distributions import get_distribution_handler
+from deploy.distributions import get_distribution_handler, get_airgapped_distribution_handler
 from deploy.os_handlers import get_os_handler
 from deploy.validation.airgap_validator import AirgapValidator
 from logo.space_jam_logo import display_animated_logo, display_space_jam_logo4
@@ -182,10 +182,12 @@ def deploy(config, extra_tools, dry_run, skip_validation, stage_only, verbose):
             log_error("Pre-deployment validation failed. Use --skip-validation to bypass.")
             return
     
+    log_message(f"{airgap_enabled}")
     # Get appropriate handlers (use airgapped versions)
     try:
         if airgap_enabled:
             # Use airgapped-specific handlers
+            log_message(f"{k8s_dist}")
             dist_handler = get_airgapped_distribution_handler(k8s_dist)
             os_handler = get_airgapped_os_handler(os_info['type'])
         else:
@@ -197,6 +199,7 @@ def deploy(config, extra_tools, dry_run, skip_validation, stage_only, verbose):
     
     # Distribution-specific validation
     click.echo(colorama.Fore.CYAN + "\nValidating distribution requirements...")
+    log_message(f" Current:......{dist_handler.get_distribution_name()}")
     if not dist_handler.validate_requirements(cfg):
         log_error("Distribution validation failed")
         return
@@ -223,6 +226,9 @@ def deploy(config, extra_tools, dry_run, skip_validation, stage_only, verbose):
         else:
             node_os_handler = get_os_handler(node_os['type'])
         
+        log_message(f" Node distribution handler: {dist_handler.get_distribution_name()}")
+        log_message(f" Node OS handler: {node_os_handler.get_os_name()}")
+        
         if not setup_node(node, cfg, dist_handler, node_os_handler, 
                          is_server=True, is_first_server=is_first_server):
             log_error(f"Failed to setup server {node['hostname']}")
@@ -241,6 +247,9 @@ def deploy(config, extra_tools, dry_run, skip_validation, stage_only, verbose):
             node_os_handler = get_airgapped_os_handler(node_os['type'])
         else:
             node_os_handler = get_os_handler(node_os['type'])
+        
+        log_message(f" Node distribution handler: {dist_handler.get_distribution_name()}")
+        log_message(f" Node OS handler: {node_os_handler.get_os_name()}")
             
         if not setup_node(node, cfg, dist_handler, node_os_handler, is_server=False):
             log_error(f"Failed to setup agent {node['hostname']}")
@@ -274,6 +283,7 @@ def deploy(config, extra_tools, dry_run, skip_validation, stage_only, verbose):
 def get_airgapped_distribution_handler(distribution):
     """Get airgapped-specific distribution handler"""
     if distribution == 'rke2':
+        log_message("Looking at AirgappedRKE2Handler")
         from deploy.distributions.airgapped_rke2_handler import AirgappedRKE2Handler
         return AirgappedRKE2Handler()
     elif distribution == 'eks-a':

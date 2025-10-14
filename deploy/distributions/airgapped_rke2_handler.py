@@ -41,14 +41,13 @@ class AirgappedRKE2Handler(BaseDistributionHandler):
         self.bundle_manager = BundleManager(config)
         return True
     
-    def prepare_server_node(self, ssh_client, config, is_first_server=False):
+    def prepare_server_node(self, ssh_client, config, node, is_first_server=False):
         """Prepare RKE2 server node in airgapped environment"""
         log_message("Preparing RKE2 server node (airgapped)...")
+
+        log_message(node, f"node info: {node}")
         
-        # Stage bundles first
-        node = self._get_current_node(ssh_client, config)
-        if not self.bundle_manager.stage_bundles_to_node(ssh_client, node, 'server'):
-            return False
+        
         
         # Create directories with sudo
         directories = [
@@ -56,15 +55,15 @@ class AirgappedRKE2Handler(BaseDistributionHandler):
             "/var/lib/rancher/rke2/server/manifests",
             "/var/lib/rancher/rke2/agent/images"
         ]
-        
+        log_message(node, f"Creating directories: {directories}")
         for directory in directories:
-            cmd = f"sudo mkdir -p {directory}"
-            if not run_ssh_command(ssh_client, cmd):
+            cmd = f"mkdir -p {directory}"
+            if not run_ssh_command(ssh_client, cmd, return_output=False, timeout=300, sudo=True, sudo_password=node['sudo_password']):
                 return False
-            
+        log_success("Directories created successfully")
         # Generate and upload config
-        config_content = self.generate_server_config(config, is_first_server)
-        return self._upload_config_file(ssh_client, config_content, '/etc/rancher/rke2/config.yaml')
+        config_content = self.generate_server_config(config, node, is_first_server)
+        return self._upload_config_file(ssh_client, node, config_content, '/etc/rancher/rke2/config.yaml')
     
     def prepare_agent_node(self, ssh_client, config):
         """Prepare RKE2 agent node in airgapped environment"""
@@ -82,8 +81,8 @@ class AirgappedRKE2Handler(BaseDistributionHandler):
         ]
         
         for directory in directories:
-            cmd = f"sudo mkdir -p {directory}"
-            if not run_ssh_command(ssh_client, cmd):
+            cmd = f"mkdir -p {directory}"
+            if not run_ssh_command(ssh_client, cmd, return_output=False, timeout=300, sudo=True, sudo_password=node['sudo_password']):
                 return False
         
         # Generate and upload config
@@ -303,11 +302,13 @@ class AirgappedRKE2Handler(BaseDistributionHandler):
         
         return True
     
-    def generate_server_config(self, config, is_first_server):
+    def generate_server_config(self, config, node, is_first_server):
         """Generate RKE2 server configuration for airgapped environment"""
         k8s_distro = config['deployment']['k8s_distribution']
         cluster_config = config['cluster'][k8s_distro]
         airgap_config = config['deployment']['airgap']
+
+        log_message(node, "Generating Config")
         
         config_lines = [
             f"cluster-cidr: {cluster_config['cluster_cidr']}",
@@ -346,6 +347,7 @@ class AirgappedRKE2Handler(BaseDistributionHandler):
             for item in cluster_config['disable']:
                 config_lines.append(f"disable: {item}")
         
+        log_message(node, "Successful config output")
         return '\n'.join(config_lines)
     
     def generate_agent_config(self, config):
@@ -402,8 +404,10 @@ class AirgappedRKE2Handler(BaseDistributionHandler):
             return None
 
     
-    def _upload_config_file(self, ssh_client, content, remote_path):
+    def _upload_config_file(self, ssh_client, node, content, remote_path):
         """Upload configuration file using sudo for permissions"""
+
+        log_message(node, "Uploading Config")
         try:
             with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.yml') as tmp_file:
                 tmp_file.write(content)
@@ -416,13 +420,13 @@ class AirgappedRKE2Handler(BaseDistributionHandler):
             sftp.close()
             
             # Move to final location with sudo
-            move_cmd = f"sudo mv {temp_remote_path} {remote_path}"
-            if not run_ssh_command(ssh_client, move_cmd):
+            move_cmd = f"mv {temp_remote_path} {remote_path}"
+            if not run_ssh_command(ssh_client, move_cmd, return_output=False, timeout=300, sudo=True, sudo_password=node['sudo_password']):
                 return False
             
             # Set proper permissions
-            chmod_cmd = f"sudo chmod 644 {remote_path}"
-            run_ssh_command(ssh_client, chmod_cmd)
+            chmod_cmd = f"chmod 644 {remote_path}"
+            run_ssh_command(ssh_client, chmod_cmd, return_output=False, timeout=300, sudo=True, sudo_password=node['sudo_password'])
             
             os.unlink(tmp_file_path)
             return True

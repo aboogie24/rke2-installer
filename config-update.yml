@@ -104,7 +104,7 @@ nodes:
       ip: 10.0.4.10
       user: aboogie  # Non-root user with sudo privileges
       ssh_key: .ssh/rke2_cluster_key_new
-      sudo_password: ""  # Empty if passwordless sudo, or use vault/env var
+      sudo_password: "Fatboy24!!"  # Empty if passwordless sudo, or use vault/env var
       # Staging paths on this specific node
       staging_paths:
         bundles: "/tmp/"
@@ -128,7 +128,7 @@ nodes:
 packages:
   rhel:
     # Staged package bundles (RPMs packaged for offline installation)
-    bundle_path: "/tmp/k8s-new-bundle.tar.gz"
+    bundle_path: "/opt/k8s-new-bundle.tar.gz"
     base_packages:
       - container-selinux
       - iptables

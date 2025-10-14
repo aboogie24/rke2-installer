@@ -70,7 +70,7 @@ def setup_node(node, cfg, is_server, is_first_server=False):
             log_error(node, "Error creating directory:", details=err)
 
         # Extract preserving path structure but without top-level directory
-        extract_cmd = f"sudo tar -xzf {remote_bundle_path} --strip-components=1 -C {extract_path}"
+        extract_cmd = f"sudo tar -xzf {remote_bundle_path} trip-co--smponents=1 -C {extract_path}"
         log_message(node, "Extracting bundle...")
         
         # Execute with output capture

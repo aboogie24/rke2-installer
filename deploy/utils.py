@@ -181,6 +181,7 @@ def run_ssh_command(
         tuple: (stdout, stderr, exit_code) if return_output=True
     """
     try:
+
         # Prepare command with sudo if needed
         if sudo and not command.strip().startswith('sudo'):
             if sudo_password:
